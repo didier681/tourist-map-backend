@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: turismo_test
+          MYSQL_USER: turismo
+          MYSQL_PASSWORD: turismo_ci_password
+          MYSQL_ROOT_PASSWORD: root_ci_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot_ci_password --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+          --health-start-period=30s
+    defaults:
+      run:
+        working-directory: turismo
+    env:
+      NODE_ENV: test
+      PORT: 3000
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USERNAME: turismo
+      DB_PASSWORD: turismo_ci_password
+      DB_DATABASE: turismo_test
+      DB_SYNCHRONIZE: "false"
+      JWT_SECRET: ci-access-secret-at-least-32-characters
+      JWT_REFRESH_SECRET: ci-refresh-secret-is-also-32-characters
+      JWT_EXPIRATION: 15m
+      JWT_REFRESH_EXPIRATION: 7d
+      TERMS_VERSION: 1.0
+      FRONTEND_URL: http://localhost:3000
+      CORS_ORIGINS: ""
+      SWAGGER_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: turismo/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
+      - run: npm run migration:run:prod
+      - run: npm run migration:check:prod
+      - run: npm run test:e2e
