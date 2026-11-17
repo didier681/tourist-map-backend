@@ -41,7 +41,7 @@ jobs:
       JWT_REFRESH_SECRET: ci-refresh-secret-is-also-32-characters
       JWT_EXPIRATION: 15m
       JWT_REFRESH_EXPIRATION: 7d
-      TERMS_VERSION: 1.0
+      TERMS_VERSION: "1.0"
       FRONTEND_URL: http://localhost:3000
       CORS_ORIGINS: ""
       SWAGGER_ENABLED: "false"
