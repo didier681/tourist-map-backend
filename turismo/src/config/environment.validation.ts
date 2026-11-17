@@ -18,7 +18,9 @@ export const environmentValidationSchema = Joi.object({
   JWT_REFRESH_SECRET: Joi.string().min(32).required(),
   JWT_REFRESH_EXPIRATION: Joi.string().default('7d'),
   TERMS_VERSION: Joi.string().trim().min(1).max(50).default('1.0'),
-  FRONTEND_URL: Joi.string().uri({ scheme: ['http', 'https'] }).default('http://localhost:3000'),
+  FRONTEND_URL: Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .default('http://localhost:3000'),
   SMTP_HOST: Joi.string().optional(),
   SMTP_PORT: Joi.number().port().optional(),
   SMTP_USER: Joi.string().optional(),
@@ -45,13 +47,12 @@ export const environmentValidationSchema = Joi.object({
         }
       });
 
-      return invalidOrigin === undefined
-        ? value
-        : helpers.error('string.uri');
+      return invalidOrigin === undefined ? value : helpers.error('string.uri');
     }),
   SWAGGER_ENABLED: Joi.boolean().default(false),
   DB_SYNCHRONIZE: Joi.boolean().default(false),
-  ADMIN_EMAIL: Joi.string().email(),
+  // El dominio local del ejemplo no debe bloquear el arranque en entornos reales.
+  ADMIN_EMAIL: Joi.string().email({ tlds: { allow: false } }),
   ADMIN_PASSWORD: Joi.string().pattern(passwordPattern).min(10).max(72),
   ADMIN_NOMBRE: Joi.string(),
 })

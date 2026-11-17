@@ -1,5 +1,7 @@
 # Córdoba Cerca
 
+[![CI](https://github.com/didier681/turismo_backend/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/didier681/turismo_backend/actions/workflows/ci.yml)
+
 Córdoba Cerca es una API de turismo para el departamento de Córdoba. Permite consultar y administrar sitios turísticos, negocios y servicios, y ofrece funciones para que las personas visitantes interactúen con el catálogo.
 
 ## Tecnologías
@@ -187,6 +189,7 @@ npm run build     # Compilación
 | `CORS_ORIGINS` | No | Orígenes HTTP/HTTPS separados por comas. Vacío permite localhost solo en desarrollo. |
 | `SWAGGER_ENABLED` | No | Publica Swagger solo con `true`; por defecto `false`. |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NOMBRE` | Solo para seed | Datos del administrador inicial; la contraseña requiere 10 caracteres, mayúscula, minúscula y número. |
+| `MYSQL_ROOT_PASSWORD` | Solo para Docker Compose | Contraseña de root para inicializar MySQL 8.4; usa un secreto largo y exclusivo. |
 
 En desarrollo, las migraciones se ejecutan manualmente y `DB_SYNCHRONIZE` es `false` por defecto. Si se activa la sincronización local, nunca debe usarse con `NODE_ENV=production`. En producción, configure `NODE_ENV=production`, `DB_SYNCHRONIZE=false` y orígenes CORS explícitos; el servidor ejecutará las migraciones pendientes al iniciar y Swagger permanecerá oculto salvo habilitación explícita.
 
@@ -197,3 +200,50 @@ npm run migration:generate -- src/database/migrations/NombreDelCambio
 ```
 
 Use `npm run migration:run` para aplicarlas y `npm run migration:revert` para revertir la última migración aplicada.
+
+## Despliegue con Docker
+
+Docker Compose inicia MySQL 8.4 con almacenamiento persistente. El contenedor de la API espera a que la base de datos esté sana, aplica las migraciones compiladas y luego inicia NestJS:
+
+```bash
+cp .env.example .env
+# Edita .env con secretos y credenciales únicos antes de desplegar.
+docker compose up -d
+docker compose logs -f api
+```
+
+El seed es una operación explícita y se ejecuta después de las migraciones:
+
+```bash
+docker compose exec api npm run seed:prod
+```
+
+Compose lee la configuración de `.env`; `DB_HOST` se establece internamente en `db`. El volumen `mysql_data` conserva la base al recrear los contenedores. Para aplicar manualmente migraciones nuevas en un contenedor ya iniciado, usa `docker compose exec api npm run migration:run:prod`.
+
+## Checklist de producción
+
+- [ ] `NODE_ENV=production` y `DB_SYNCHRONIZE=false`.
+- [ ] `SWAGGER_ENABLED=false` o Swagger protegido por el proxy/control de acceso.
+- [ ] `CORS_ORIGINS` contiene únicamente el dominio HTTPS real del frontend.
+- [ ] `JWT_SECRET`, `JWT_REFRESH_SECRET`, claves de base de datos y `MYSQL_ROOT_PASSWORD` son largos, únicos y no reutilizados.
+- [ ] SMTP está configurado con credenciales de producción para recuperación de contraseña.
+- [ ] El tráfico HTTPS termina en un proxy inverso correctamente configurado.
+- [ ] Hay backups automatizados de MySQL y se ha probado su restauración.
+- [ ] Se revisan los logs y el healthcheck de `/health` después del despliegue.
+
+## Pruebas e2e
+
+Las pruebas e2e usan una base MySQL real llamada `turismo_test`: compilan el proyecto, ejecutan las migraciones compiladas y limpian las tablas antes de la suite. No apuntes esta variable a una base con datos que quieras conservar.
+
+Primero crea la base y concede acceso al usuario de pruebas en MySQL:
+
+```sql
+CREATE DATABASE turismo_test;
+GRANT ALL PRIVILEGES ON turismo_test.* TO 'turismo'@'%';
+```
+
+```bash
+DB_HOST=127.0.0.1 DB_PORT=3306 DB_USERNAME=turismo DB_PASSWORD=turismo_ci_password npm run test:e2e
+```
+
+En Windows PowerShell, define esas variables en la sesión antes de ejecutar `npm run test:e2e`. El workflow de GitHub Actions prepara MySQL 8.4 y ejecuta lint, build, pruebas unitarias, migraciones y e2e en cada push o pull request a `main`.

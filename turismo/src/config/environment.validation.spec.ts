@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { parse } from 'dotenv';
 import { environmentValidationSchema } from './environment.validation';
 
 const requiredEnvironment = {
@@ -11,6 +14,15 @@ const requiredEnvironment = {
 };
 
 describe('environmentValidationSchema', () => {
+  it('valida todas las variables del archivo .env.example', () => {
+    const example = parse(readFileSync(resolve(process.cwd(), '.env.example')));
+    const { error } = environmentValidationSchema.validate(example, {
+      abortEarly: false,
+    });
+
+    expect(error).toBeUndefined();
+  });
+
   it('aplica valores predeterminados y acepta variables de configuración válidas', () => {
     const { error, value } =
       environmentValidationSchema.validate(requiredEnvironment);

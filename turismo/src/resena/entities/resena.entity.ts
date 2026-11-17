@@ -27,7 +27,8 @@ export class Resena {
   @PrimaryGeneratedColumn({ name: 'id_resena' })
   idResena: number;
 
-  @Column({ type: 'int', name: 'id_usuario', nullable: true })
+  // Los NULL explícitos mantienen el contrato de índices únicos y anonimización.
+  @Column({ type: 'int', name: 'id_usuario', nullable: true, default: null })
   idUsuario: number | null;
 
   // Mantiene la calificación al eliminar la cuenta y sustituye los datos del autor por anonimato.
@@ -45,7 +46,7 @@ export class Resena {
   @JoinColumn({ name: 'id_usuario', referencedColumnName: 'id' })
   usuario: User | null;
 
-  @Column({ type: 'int', name: 'id_sitio', nullable: true })
+  @Column({ type: 'int', name: 'id_sitio', nullable: true, default: null })
   idSitio: number | null;
 
   // Cada reseña corresponde a un único destino; la otra clave queda nula.
@@ -55,7 +56,7 @@ export class Resena {
   @JoinColumn({ name: 'id_sitio', referencedColumnName: 'idSitio' })
   sitio: SitioTuristico | null;
 
-  @Column({ type: 'int', name: 'id_negocio', nullable: true })
+  @Column({ type: 'int', name: 'id_negocio', nullable: true, default: null })
   idNegocio: number | null;
 
   @ManyToOne(() => Negocio, { nullable: true, onDelete: 'CASCADE' })

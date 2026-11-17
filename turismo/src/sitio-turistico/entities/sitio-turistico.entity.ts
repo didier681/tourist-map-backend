@@ -76,7 +76,13 @@ export class SitioTuristico {
   })
   estadoRevision: EstadoRevision;
 
-  @Column({ type: 'int', name: 'id_usuario_sugiere', nullable: true })
+  // El valor nulo explícito mantiene estable el esquema al generar migraciones.
+  @Column({
+    type: 'int',
+    name: 'id_usuario_sugiere',
+    nullable: true,
+    default: null,
+  })
   idUsuarioSugiere: number | null;
 
   @ManyToOne(() => User, (usuario) => usuario.sitiosSugeridos, {
@@ -86,7 +92,12 @@ export class SitioTuristico {
   @JoinColumn({ name: 'id_usuario_sugiere', referencedColumnName: 'id' })
   usuarioSugiere: User | null;
 
-  @Column({ type: 'text', name: 'motivo_rechazo', nullable: true })
+  @Column({
+    type: 'text',
+    name: 'motivo_rechazo',
+    nullable: true,
+    default: null,
+  })
   motivoRechazo: string | null;
 
   @Column({ type: 'int', default: 0 })

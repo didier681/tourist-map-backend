@@ -43,6 +43,7 @@ export class User {
     name: 'documento_identidad',
     unique: true,
     nullable: true,
+    default: null,
   })
   documentoIdentidad: string | null;
 
@@ -54,6 +55,7 @@ export class User {
     length: 255,
     name: 'soporte_url',
     nullable: true,
+    default: null,
   })
   soporteUrl: string | null;
 
@@ -81,6 +83,7 @@ export class User {
     type: 'datetime',
     name: 'fecha_aceptacion_terminos',
     nullable: true,
+    default: null,
   })
   fechaAceptacionTerminos: Date | null;
 
@@ -89,6 +92,7 @@ export class User {
     length: 50,
     name: 'version_terminos',
     nullable: true,
+    default: null,
   })
   versionTerminos: string | null;
 

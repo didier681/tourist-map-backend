@@ -32,7 +32,14 @@ export class SolicitudNegocio {
   @Column({ type: 'json', name: 'datos_negocio' })
   datosNegocio: CreateNegocioDto;
 
-  @Column({ type: 'varchar', length: 2048, name: 'soporte_url', nullable: true })
+  // Los opcionales se declaran con DEFAULT NULL para igualar el DDL de MySQL.
+  @Column({
+    type: 'varchar',
+    length: 2048,
+    name: 'soporte_url',
+    nullable: true,
+    default: null,
+  })
   soporteUrl: string | null;
 
   @Column({
@@ -42,7 +49,7 @@ export class SolicitudNegocio {
   })
   estado: EstadoSolicitudNegocio;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: 'text', nullable: true, default: null })
   motivo: string | null;
 
   @CreateDateColumn({ type: 'timestamp', name: 'fecha_solicitud' })

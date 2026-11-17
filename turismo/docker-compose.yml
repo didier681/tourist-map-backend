@@ -1,0 +1,54 @@
+services:
+  db:
+    # La base persistente no depende del ciclo de vida del contenedor de la API.
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:?Configura DB_DATABASE en .env}
+      MYSQL_USER: ${DB_USERNAME:?Configura DB_USERNAME en .env}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Configura DB_PASSWORD en .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Configura MYSQL_ROOT_PASSWORD en .env}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  api:
+    # La imagen final solo contiene código compilado y dependencias de producción.
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE:?Configura DB_DATABASE en .env}
+      DB_USERNAME: ${DB_USERNAME:?Configura DB_USERNAME en .env}
+      DB_PASSWORD: ${DB_PASSWORD:?Configura DB_PASSWORD en .env}
+      DB_SYNCHRONIZE: "false"
+      SWAGGER_ENABLED: "false"
+      # Evita entregar a API la contraseña root usada solo para inicializar MySQL.
+      MYSQL_ROOT_PASSWORD: ""
+    ports:
+      - "${PORT:-3000}:3000"
+    depends_on:
+      # Evita intentar migraciones antes de que MySQL acepte conexiones.
+      db:
+        condition: service_healthy
+    command:
+      ["sh", "-c", "npm run migration:run:prod && npm run start:prod"]
+
+volumes:
+  mysql_data:

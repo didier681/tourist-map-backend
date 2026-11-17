@@ -10,6 +10,8 @@ import { QueryFailedFilter } from './common/filters/query-failed.filter';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
+  // Permite que Nest cierre TypeORM y otros recursos al terminar el contenedor.
+  app.enableShutdownHooks();
   const configService = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
 
@@ -36,10 +38,7 @@ async function bootstrap(): Promise<void> {
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
-  const developmentOrigins = [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-  ];
+  const developmentOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000'];
   const allowedOrigins =
     configuredOrigins.length > 0
       ? configuredOrigins

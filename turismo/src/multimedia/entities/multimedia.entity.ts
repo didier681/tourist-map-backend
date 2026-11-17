@@ -37,11 +37,23 @@ export class Multimedia {
   tipoContenido: TipoContenidoMultimedia;
 
   // Dirección del recurso visual o audiovisual, si aplica.
-  @Column({ type: 'varchar', length: 2048, name: 'url_contenido', nullable: true })
+  // Declara NULL como default para que el esquema migrado coincida con TypeORM.
+  @Column({
+    type: 'varchar',
+    length: 2048,
+    name: 'url_contenido',
+    nullable: true,
+    default: null,
+  })
   urlContenido: string | null;
 
   // Texto asociado al registro cuando el contenido es de tipo texto.
-  @Column({ type: 'text', name: 'texto_contenido', nullable: true })
+  @Column({
+    type: 'text',
+    name: 'texto_contenido',
+    nullable: true,
+    default: null,
+  })
   textoContenido: string | null;
 
   // Posición en la que se presenta este contenido frente a los demás.

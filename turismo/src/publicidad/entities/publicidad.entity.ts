@@ -39,7 +39,13 @@ export class Publicidad {
   negocio: Negocio;
 
   // Clave opcional del sitio turístico asociado a la campaña.
-  @Column({ type: 'int', name: 'id_sitio_asociado', nullable: true })
+  // Mantiene explícito el mismo default nulo usado por las migraciones MySQL.
+  @Column({
+    type: 'int',
+    name: 'id_sitio_asociado',
+    nullable: true,
+    default: null,
+  })
   idSitioAsociado: number | null;
 
   // Sitio turístico que la publicidad puede destacar.

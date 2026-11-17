@@ -36,7 +36,8 @@ import { SolicitudNegocioModule } from './solicitud-negocio/solicitud-negocio.mo
     // Limita el uso por dirección IP para reducir abuso sin bloquear clientes normales.
     ThrottlerModule.forRoot({
       throttlers: [{ name: 'default', limit: 100, ttl: 60_000 }],
-      errorMessage: 'Has superado el límite de solicitudes; inténtalo de nuevo más tarde',
+      errorMessage:
+        'Has superado el límite de solicitudes; inténtalo de nuevo más tarde',
     }),
 
     // Las migraciones sustituyen la sincronización automática del esquema en producción.
@@ -53,7 +54,8 @@ import { SolicitudNegocioModule } from './solicitud-negocio/solicitud-negocio.mo
         synchronize:
           configService.get<boolean>('DB_SYNCHRONIZE', false) &&
           configService.get<string>('NODE_ENV') !== 'production',
-        migrations: [__dirname + '/database/migrations/*{.ts,.js}'],
+        // El proceso de API usa migraciones compiladas; el CLI de desarrollo configura su ruta TS por separado.
+        migrations: [__dirname + '/database/migrations/*.js'],
         migrationsRun: configService.get<string>('NODE_ENV') === 'production',
       }),
     }),

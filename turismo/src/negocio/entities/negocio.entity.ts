@@ -58,7 +58,8 @@ export class Negocio {
   zona: Zona;
 
   // Clave opcional del sitio turístico asociado al negocio.
-  @Column({ type: 'int', name: 'id_sitio', nullable: true })
+  // Explicita los defaults nulos para evitar deriva entre migración y metadata.
+  @Column({ type: 'int', name: 'id_sitio', nullable: true, default: null })
   idSitio: number | null;
 
   // Un negocio puede estar o no asociado a un sitio turístico.
@@ -70,22 +71,34 @@ export class Negocio {
   @Column({ type: 'varchar', length: 255, name: 'nombre_comercial' })
   nombreComercial: string;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: 'text', nullable: true, default: null })
   descripcion: string | null;
 
-  @Column({ type: 'varchar', length: 500, nullable: true })
+  @Column({ type: 'varchar', length: 500, nullable: true, default: null })
   direccion: string | null;
 
-  @Column({ type: 'varchar', length: 2048, name: 'sitio_web', nullable: true })
+  @Column({
+    type: 'varchar',
+    length: 2048,
+    name: 'sitio_web',
+    nullable: true,
+    default: null,
+  })
   sitioWeb: string | null;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true, default: null })
   instagram: string | null;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true, default: null })
   facebook: string | null;
 
-  @Column({ type: 'varchar', length: 2048, name: 'logo_url', nullable: true })
+  @Column({
+    type: 'varchar',
+    length: 2048,
+    name: 'logo_url',
+    nullable: true,
+    default: null,
+  })
   logoUrl: string | null;
 
   // NIT u otro documento de identificación del negocio.
@@ -119,7 +132,12 @@ export class Negocio {
   })
   estadoVerificacion: EstadoVerificacion;
 
-  @Column({ type: 'text', name: 'motivo_rechazo', nullable: true })
+  @Column({
+    type: 'text',
+    name: 'motivo_rechazo',
+    nullable: true,
+    default: null,
+  })
   motivoRechazo: string | null;
 
   // Nivel de membresía; si no se indica, inicia como gratis.
