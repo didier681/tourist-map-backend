@@ -21,6 +21,8 @@ import { TarifaModule } from './tarifa/tarifa.module';
 import { PublicidadModule } from './publicidad/publicidad.module';
 import { MultimediaModule } from './multimedia/multimedia.module';
 import { HealthModule } from './health/health.module';
+import { AuditoriaModule } from './auditoria/auditoria.module';
+import { SolicitudNegocioModule } from './solicitud-negocio/solicitud-negocio.module';
 
 @Module({
   imports: [
@@ -75,6 +77,8 @@ import { HealthModule } from './health/health.module';
     PublicidadModule,
     MultimediaModule,
     HealthModule,
+    AuditoriaModule,
+    SolicitudNegocioModule,
   ],
   // Aplica el límite global y deja que las rutas de autenticación lo reduzcan individualmente.
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

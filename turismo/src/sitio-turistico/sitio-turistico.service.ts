@@ -35,6 +35,7 @@ import { ProximityQueryDto } from '../common/geo/proximity-query.dto';
 import { SiteListQueryDto } from '../common/pagination/site-list-query.dto';
 import { PaginatedResult, paginateArray } from '../common/pagination/paginated-result';
 import { sanitizeText } from '../common/sanitize-text';
+import { AuditoriaService } from '../auditoria/auditoria.service';
 
 @Injectable()
 // Gestiona sitios turísticos, sugerencias de la comunidad y su moderación.
@@ -51,6 +52,7 @@ export class SitioTuristicoService {
     @InjectRepository(ConfirmacionSitio)
     private readonly confirmacionRepository: Repository<ConfirmacionSitio>,
     private readonly dataSource: DataSource,
+    private readonly auditoriaService: AuditoriaService,
   ) {}
 
   // Comprueba la zona asociada antes de guardar el nuevo sitio.
@@ -266,6 +268,7 @@ export class SitioTuristicoService {
       .select('AVG(resena.calificacion)', 'promedio')
       .addSelect('COUNT(resena.idResena)', 'total')
       .where('resena.idSitio = :idSitio', { idSitio: id })
+      .andWhere('resena.estado = :visible', { visible: 'visible' })
       .getRawOne<{ promedio: string | null; total: string }>();
 
     if (!resultado) {
@@ -305,7 +308,11 @@ export class SitioTuristicoService {
   }
 
   // Aprueba una sugerencia solo si el usuario administra la zona del sitio.
-  async approve(id: number, user: User): Promise<SitioTuristico> {
+  async approve(
+    id: number,
+    user: User,
+    ip?: string,
+  ): Promise<SitioTuristico> {
     const sitio = await this.findForModeration(id);
     await this.assertCanManageZone(sitio.idZona, user);
     sitio.estadoRevision = EstadoRevision.Aprobado;
@@ -313,6 +320,13 @@ export class SitioTuristicoService {
     const aprobado = await this.sitioRepository.save(sitio);
     // Identifica la sugerencia y al responsable para auditar la moderación.
     this.logger.log(`Sugerencia ${id} aprobada por el usuario ${user.id}`);
+    await this.auditoriaService.registrar({
+      idUsuario: user.id,
+      accion: 'aprobacion_sugerencia',
+      entidad: 'sitio_turistico',
+      idEntidad: id,
+      ip,
+    });
     return aprobado;
   }
 
@@ -321,6 +335,7 @@ export class SitioTuristicoService {
     id: number,
     dto: RechazarSitioTuristicoDto,
     user: User,
+    ip?: string,
   ): Promise<SitioTuristico> {
     const sitio = await this.findForModeration(id);
     await this.assertCanManageZone(sitio.idZona, user);
@@ -329,6 +344,14 @@ export class SitioTuristicoService {
     const rechazado = await this.sitioRepository.save(sitio);
     // Registra el rechazo sin repetir el motivo, que puede contener datos aportados por usuarios.
     this.logger.log(`Sugerencia ${id} rechazada por el usuario ${user.id}`);
+    await this.auditoriaService.registrar({
+      idUsuario: user.id,
+      accion: 'rechazo_sugerencia',
+      entidad: 'sitio_turistico',
+      idEntidad: id,
+      detalle: { motivo: rechazado.motivoRechazo },
+      ip,
+    });
     return rechazado;
   }
 

@@ -11,7 +11,9 @@ import {
   HttpStatus,
   SerializeOptions,
   UseGuards,
+  Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -43,16 +45,22 @@ export class UserController {
   }
 
   @Post('gestores')
-  createGestor(@Body() dto: CreateGestorDto): Promise<User> {
-    return this.userService.createGestor(dto);
+  createGestor(
+    @Body() dto: CreateGestorDto,
+    @GetUser() admin: User,
+    @Req() request: Request,
+  ): Promise<User> {
+    return this.userService.createGestor(dto, admin, request.ip);
   }
 
   @Post(':id/zonas')
   assignZonas(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: AssignGestorZonasDto,
+    @GetUser() admin: User,
+    @Req() request: Request,
   ): Promise<GestorZona[]> {
-    return this.userService.assignZonas(id, dto);
+    return this.userService.assignZonas(id, dto, admin, request.ip);
   }
 
   @Get()
@@ -83,18 +91,24 @@ export class UserController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateAccountStateDto,
     @GetUser() admin: User,
+    @Req() request: Request,
   ): Promise<User> {
     return this.userService.updateAccountState(
       id,
       dto.isActive,
       dto.motivo,
       admin.id,
+      request.ip,
     );
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
-    return this.userService.remove(id);
+  remove(
+    @Param('id', ParseIntPipe) id: number,
+    @GetUser() admin: User,
+    @Req() request: Request,
+  ): Promise<void> {
+    return this.userService.remove(id, admin, request.ip);
   }
 }

@@ -11,13 +11,18 @@ import {
   Post,
   Query,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiConflictResponse,
   ApiNotFoundResponse,
   ApiTags,
+  ApiOperation,
 } from '@nestjs/swagger';
+import { Request } from 'express';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { User } from '../user/entities/user.entity';
@@ -30,6 +35,8 @@ import { Type } from 'class-transformer';
 import { IsInt, IsOptional, Min } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { PaginatedResult } from '../common/pagination/paginated-result';
+import { ReportarResenaDto } from './dto/reportar-resena.dto';
+import { ModerarResenaDto } from './dto/moderar-resena.dto';
 
 class ResenaListQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional()
@@ -65,6 +72,43 @@ export class ResenaController {
     @Query() query: ResenaListQueryDto,
   ): Promise<PaginatedResult<Resena>> {
     return this.resenaService.findAll(query);
+  }
+
+  @Get('en-revision')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Listar reseñas que alcanzaron el umbral de reportes' })
+  findPending(
+    @Query() query: PaginationQueryDto,
+  ): Promise<PaginatedResult<Resena>> {
+    return this.resenaService.findPending(query);
+  }
+
+  @Patch(':id/moderar')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Hacer visible u ocultar una reseña reportada' })
+  moderate(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ModerarResenaDto,
+    @GetUser() user: User,
+    @Req() request: Request,
+  ): Promise<Resena> {
+    return this.resenaService.moderate(id, dto, user, request.ip);
+  }
+
+  @Post(':id/reportar')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Reportar una reseña ofensiva, falsa o spam' })
+  report(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ReportarResenaDto,
+    @GetUser() user: User,
+  ) {
+    return this.resenaService.report(id, dto.motivo, user);
   }
 
   @Get(':id')

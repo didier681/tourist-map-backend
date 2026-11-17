@@ -8,8 +8,9 @@ import {
   Max,
   MaxLength,
   Min,
+  IsUrl,
 } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 // La membresía no se acepta en el alta para que todo negocio nazca gratis.
 // Datos validados para registrar un negocio que siempre pertenece a una zona.
@@ -44,6 +45,42 @@ export class CreateNegocioDto {
   @IsNotEmpty()
   @MaxLength(255)
   nombreComercial: string;
+
+  @ApiPropertyOptional({ maxLength: 1000 })
+  @IsString()
+  @MaxLength(1000)
+  @IsOptional()
+  descripcion?: string;
+
+  @ApiPropertyOptional({ maxLength: 500 })
+  @IsString()
+  @MaxLength(500)
+  @IsOptional()
+  direccion?: string;
+
+  @ApiPropertyOptional({ example: 'https://ejemplo.com' })
+  @IsUrl({ require_protocol: true, protocols: ['https'] })
+  @MaxLength(2048)
+  @IsOptional()
+  sitioWeb?: string;
+
+  @ApiPropertyOptional({ maxLength: 255 })
+  @IsString()
+  @MaxLength(255)
+  @IsOptional()
+  instagram?: string;
+
+  @ApiPropertyOptional({ maxLength: 255 })
+  @IsString()
+  @MaxLength(255)
+  @IsOptional()
+  facebook?: string;
+
+  @ApiPropertyOptional({ example: 'https://ejemplo.com/logo.png' })
+  @IsUrl({ require_protocol: true, protocols: ['https'] })
+  @MaxLength(2048)
+  @IsOptional()
+  logoUrl?: string;
 
   @ApiProperty({
     description: 'NIT u otro documento de identificación del negocio.',

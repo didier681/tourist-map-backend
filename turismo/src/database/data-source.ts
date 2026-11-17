@@ -21,6 +21,10 @@ import { Publicidad } from '../publicidad/entities/publicidad.entity';
 import { Multimedia } from '../multimedia/entities/multimedia.entity';
 import { RefreshToken } from '../auth/entities/refresh-token.entity';
 import { PasswordResetToken } from '../auth/entities/password-reset-token.entity';
+import { HorarioNegocio } from '../negocio/entities/horario-negocio.entity';
+import { SolicitudNegocio } from '../solicitud-negocio/entities/solicitud-negocio.entity';
+import { ReporteResena } from '../resena/entities/reporte-resena.entity';
+import { Auditoria } from '../auditoria/entities/auditoria.entity';
 
 loadEnvironment();
 
@@ -60,6 +64,10 @@ const entities = [
   Multimedia,
   RefreshToken,
   PasswordResetToken,
+  HorarioNegocio,
+  SolicitudNegocio,
+  ReporteResena,
+  Auditoria,
 ];
 
 export default new DataSource({

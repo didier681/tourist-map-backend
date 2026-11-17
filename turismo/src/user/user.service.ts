@@ -17,6 +17,7 @@ import { GestorZona } from '../gestor-zona/entities/gestor-zona.entity';
 import { Zona } from '../zona/entities/zona.entity';
 import { assertPasswordPolicy } from '../common/password-policy';
 import { RefreshToken } from '../auth/entities/refresh-token.entity';
+import { AuditoriaService } from '../auditoria/auditoria.service';
 
 @Injectable()
 // Contiene las reglas de negocio y el acceso a persistencia de usuarios.
@@ -35,6 +36,7 @@ export class UserService {
     @InjectRepository(Zona)
     private readonly zonaRepository: Repository<Zona>,
     private readonly dataSource: DataSource,
+    private readonly auditoriaService: AuditoriaService,
   ) {}
 
   /**
@@ -79,7 +81,11 @@ export class UserService {
   }
 
   // Crea un gestor inactivo; el administrador debe activarlo explícitamente.
-  async createGestor(createGestorDto: CreateGestorDto): Promise<User> {
+  async createGestor(
+    createGestorDto: CreateGestorDto,
+    admin?: User,
+    ip?: string,
+  ): Promise<User> {
     assertPasswordPolicy(createGestorDto.password);
     await this.assertIdentityAvailable(
       createGestorDto.email,
@@ -101,6 +107,14 @@ export class UserService {
     const gestor = await this.userRepository.save(user);
     // Registra la creación para auditoría sin incluir credenciales.
     this.logger.log(`Gestor creado: ${gestor.email} (ID ${gestor.id})`);
+    await this.auditoriaService.registrar({
+      idUsuario: admin?.id,
+      accion: 'creacion_gestor',
+      entidad: 'usuario',
+      idEntidad: gestor.id,
+      detalle: { rol: UserRole.Gestor },
+      ip,
+    });
     return gestor;
   }
 
@@ -108,6 +122,8 @@ export class UserService {
   async assignZonas(
     idUsuario: number,
     dto: AssignGestorZonasDto,
+    admin?: User,
+    ip?: string,
   ): Promise<GestorZona[]> {
     const user = await this.findOne(idUsuario);
     if (user.role !== UserRole.Gestor) {
@@ -127,11 +143,20 @@ export class UserService {
       throw new NotFoundException(`Zona con ID ${idInexistente} no encontrada`);
     }
 
-    return await this.gestorZonaRepository.save(
+    const asignaciones = await this.gestorZonaRepository.save(
       dto.idZonas.map((idZona) =>
         this.gestorZonaRepository.create({ idUsuario, idZona }),
       ),
     );
+    await this.auditoriaService.registrar({
+      idUsuario: admin?.id,
+      accion: 'asignacion_zonas',
+      entidad: 'usuario',
+      idEntidad: idUsuario,
+      detalle: { idZonas: dto.idZonas },
+      ip,
+    });
+    return asignaciones;
   }
 
   // Activa la cuenta de un gestor tras la aprobación administrativa.
@@ -197,6 +222,7 @@ export class UserService {
     isActive: boolean,
     motivo?: string,
     adminId?: number,
+    ip?: string,
   ): Promise<User> {
     if (!isActive && id === adminId) {
       throw new BadRequestException('No puedes suspender tu propia cuenta');
@@ -211,6 +237,17 @@ export class UserService {
           { revocado: true },
         );
       }
+      await this.auditoriaService.registrar(
+        {
+          idUsuario: adminId,
+          accion: isActive ? 'reactivacion_usuario' : 'suspension_usuario',
+          entidad: 'usuario',
+          idEntidad: id,
+          detalle: { isActive, motivo: motivo ?? null },
+          ip,
+        },
+        manager,
+      );
     });
     user.isActive = isActive;
     // El motivo ayuda a auditar la acción, pero nunca sustituye el estado persistido.
@@ -322,8 +359,15 @@ export class UserService {
   /**
    * Elimina físicamente la cuenta después de comprobar que existe.
    */
-  async remove(id: number): Promise<void> {
+  async remove(id: number, admin?: User, ip?: string): Promise<void> {
     const user: User = await this.findOne(id);
+    await this.auditoriaService.registrar({
+      idUsuario: admin?.id,
+      accion: 'eliminacion_cuenta',
+      entidad: 'usuario',
+      idEntidad: id,
+      ip,
+    });
     await this.userRepository.remove(user);
   }
 }

@@ -9,7 +9,9 @@ import {
   SerializeOptions,
   Patch,
   Delete,
+  Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -113,8 +115,13 @@ export class AuthController {
   deleteMyAccount(
     @GetUser() user: User,
     @Body() dto: CurrentPasswordDto,
+    @Req() request: Request,
   ): Promise<{ message: string }> {
-    return this.authService.deleteAccount(user.id, dto.passwordActual);
+    return this.authService.deleteAccount(
+      user.id,
+      dto.passwordActual,
+      request.ip,
+    );
   }
 
   @Post('refresh')

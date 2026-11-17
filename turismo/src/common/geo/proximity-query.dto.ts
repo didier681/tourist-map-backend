@@ -1,10 +1,11 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsInt,
   IsLatitude,
   IsLongitude,
   IsOptional,
   IsString,
+  IsBoolean,
   Max,
   Min,
 } from 'class-validator';
@@ -46,4 +47,12 @@ export class ProximityQueryDto extends PaginationQueryDto {
   @IsString()
   @IsOptional()
   q?: string;
+
+  @ApiPropertyOptional({ default: false })
+  @Transform(({ value }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean()
+  @IsOptional()
+  abiertoAhora = false;
 }

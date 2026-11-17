@@ -11,7 +11,9 @@ import {
   Post,
   Query,
   UseGuards,
+  Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import {
   ApiBearerAuth,
   ApiBadRequestResponse,
@@ -139,8 +141,9 @@ export class SitioTuristicoController {
   aprobar(
     @Param('id', ParseIntPipe) id: number,
     @GetUser() user: User,
+    @Req() request: Request,
   ): Promise<SitioTuristico> {
-    return this.sitioService.approve(id, user);
+    return this.sitioService.approve(id, user, request.ip);
   }
 
   @Patch(':id/rechazar')
@@ -153,8 +156,9 @@ export class SitioTuristicoController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: RechazarSitioTuristicoDto,
     @GetUser() user: User,
+    @Req() request: Request,
   ): Promise<SitioTuristico> {
-    return this.sitioService.reject(id, dto, user);
+    return this.sitioService.reject(id, dto, user, request.ip);
   }
 
   @Post(':id/confirmar')

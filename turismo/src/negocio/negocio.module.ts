@@ -6,9 +6,20 @@ import { NegocioController } from './negocio.controller';
 import { NegocioService } from './negocio.service';
 import { Negocio } from './entities/negocio.entity';
 import { User } from '../user/entities/user.entity';
+import { HorarioNegocio } from './entities/horario-negocio.entity';
+import { Resena } from '../resena/entities/resena.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Negocio, SitioTuristico, Zona, User])],
+  imports: [
+    TypeOrmModule.forFeature([
+      Negocio,
+      SitioTuristico,
+      Zona,
+      User,
+      HorarioNegocio,
+      Resena,
+    ]),
+  ],
   controllers: [NegocioController],
   providers: [NegocioService],
   exports: [NegocioService],

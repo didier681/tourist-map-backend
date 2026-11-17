@@ -73,4 +73,11 @@ export class Publicidad {
     default: EstadoPublicidad.Activo,
   })
   estado: EstadoPublicidad;
+
+  // Los contadores se guardan en la campaña para obtener métricas sin conservar datos del visitante.
+  @Column({ type: 'int', default: 0 })
+  impresiones: number;
+
+  @Column({ type: 'int', default: 0 })
+  clics: number;
 }

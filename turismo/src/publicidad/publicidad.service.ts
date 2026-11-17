@@ -5,9 +5,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import {
   EstadoMembresia,
+  EstadoVerificacion,
   Negocio,
 } from '../negocio/entities/negocio.entity';
 import { SitioTuristico } from '../sitio-turistico/entities/sitio-turistico.entity';
@@ -78,17 +79,28 @@ export class PublicidadService {
     query: PaginationQueryDto,
   ): Promise<PaginatedResult<Publicidad>> {
     const hoy = fechaLocalActual();
-    const [data, total] = await this.publicidadRepository.findAndCount({
-      where: {
-        estado: EstadoPublicidad.Activo,
-        fechaIni: LessThanOrEqual(hoy),
-        fechaFin: MoreThanOrEqual(hoy),
-      },
-      relations: { negocio: true, sitioAsociado: true },
-      order: { fechaIni: 'ASC' },
-      skip: (query.page - 1) * query.limit,
-      take: query.limit,
-    });
+    const builder = this.publicidadRepository
+      .createQueryBuilder('publicidad')
+      .leftJoinAndSelect('publicidad.sitioAsociado', 'sitioAsociado')
+      .innerJoinAndSelect(
+        'publicidad.negocio',
+        'negocio',
+        'negocio.estadoVerificacion = :verificado',
+        { verificado: EstadoVerificacion.Verificado },
+      )
+      .where('publicidad.estado = :activo', { activo: EstadoPublicidad.Activo })
+      .andWhere('publicidad.fechaIni <= :hoy', { hoy })
+      .andWhere('publicidad.fechaFin >= :hoy', { hoy })
+      .orderBy('publicidad.fechaIni', 'ASC')
+      .skip((query.page - 1) * query.limit)
+      .take(query.limit);
+    const [data, total] = await builder.getManyAndCount();
+    // Incrementa de forma atómica por campaña, evitando perder impresiones paralelas.
+    await Promise.all(
+      data.map(({ idPublicidad }) =>
+        this.publicidadRepository.increment({ idPublicidad }, 'impresiones', 1),
+      ),
+    );
     return {
       data,
       total,
@@ -96,6 +108,65 @@ export class PublicidadService {
       limit: query.limit,
       totalPages: Math.ceil(total / query.limit),
     };
+  }
+
+  async registerClick(id: number): Promise<{ message: string }> {
+    const publicidad = await this.findPublicCampaign(id);
+    await this.publicidadRepository.increment(
+      { idPublicidad: publicidad.idPublicidad },
+      'clics',
+      1,
+    );
+    return { message: 'Clic registrado' };
+  }
+
+  async metrics(
+    id: number,
+    user: User,
+  ): Promise<{ impresiones: number; clics: number; ctr: number }> {
+    const publicidad = await this.publicidadRepository.findOne({
+      where: { idPublicidad: id },
+      relations: { negocio: true },
+    });
+    if (!publicidad) {
+      throw new NotFoundException(`Publicidad con ID ${id} no encontrada`);
+    }
+    if (
+      user.role !== UserRole.Admin &&
+      publicidad.negocio.idUsuario !== user.id
+    ) {
+      throw new ForbiddenException('No eres propietario de esta campaña');
+    }
+    return {
+      impresiones: publicidad.impresiones,
+      clics: publicidad.clics,
+      ctr:
+        publicidad.impresiones === 0
+          ? 0
+          : (publicidad.clics / publicidad.impresiones) * 100,
+    };
+  }
+
+  private async findPublicCampaign(id: number): Promise<Publicidad> {
+    const publicidad = await this.publicidadRepository
+      .createQueryBuilder('publicidad')
+      .innerJoin(
+        'publicidad.negocio',
+        'negocio',
+        'negocio.estadoVerificacion = :verificado',
+        { verificado: EstadoVerificacion.Verificado },
+      )
+      .where('publicidad.idPublicidad = :id', { id })
+      .andWhere('publicidad.estado = :activo', {
+        activo: EstadoPublicidad.Activo,
+      })
+      .andWhere('publicidad.fechaIni <= :hoy', { hoy: fechaLocalActual() })
+      .andWhere('publicidad.fechaFin >= :hoy', { hoy: fechaLocalActual() })
+      .getOne();
+    if (!publicidad) {
+      throw new NotFoundException('La campaña no está activa');
+    }
+    return publicidad;
   }
 
   // Busca una publicidad por su identificador con sus relaciones.
@@ -175,6 +246,7 @@ export class PublicidadService {
       publicidad.idNegocio,
       publicidad.idSitioAsociado,
       user,
+      false,
     );
     await this.publicidadRepository.remove(publicidad);
   }
@@ -184,6 +256,7 @@ export class PublicidadService {
     idNegocio: number,
     idSitioAsociado: number | null | undefined,
     user: User,
+    requireVerified = true,
   ): Promise<Negocio> {
     const negocio = await this.negocioRepository.findOneBy({ idNegocio });
     if (!negocio) {
@@ -191,6 +264,14 @@ export class PublicidadService {
     }
     if (user.role !== UserRole.Admin && negocio.idUsuario !== user.id) {
       throw new ForbiddenException('No eres propietario de este negocio');
+    }
+    if (
+      requireVerified &&
+      negocio.estadoVerificacion !== EstadoVerificacion.Verificado
+    ) {
+      throw new ForbiddenException(
+        'El negocio debe estar verificado para gestionar publicidad',
+      );
     }
     if (idSitioAsociado !== null && idSitioAsociado !== undefined) {
       const sitioExists = await this.sitioRepository.existsBy({

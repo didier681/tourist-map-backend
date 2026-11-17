@@ -99,6 +99,36 @@ Las rutas de escritura requieren autenticación y aplican permisos por rol y, cu
 - `GET /favoritos/mios`: lista los favoritos del usuario autenticado. `GET /favoritos` y `GET /favoritos/:idUsuario/:idSitio` son exclusivos de administradores.
 - `PATCH /negocios/:id/membresia`: permite a un administrador cambiar la membresía (`gratis`, `basico` o `premium`). Los negocios nuevos siempre comienzan con membresía gratis.
 
+## Verificación y ficha de negocios
+
+Los negocios nuevos quedan `pendiente`; solo los `verificado` aparecen en `GET /negocios`, `GET /negocios/cercanos` y `GET /publicidades/activas`. El administrador consulta los pendientes en `GET /negocios/pendientes` y actualiza su estado en `PATCH /negocios/:id/verificacion`:
+
+```json
+{ "estado": "rechazado", "motivo": "No se pudo validar la documentación" }
+```
+
+El motivo es obligatorio para `rechazado` y `suspendido`. El propietario puede revisar todos sus negocios en `GET /negocios/mios`. Un usuario con rol `usuario` presenta una solicitud con `POST /solicitudes-negocio` (campos de `CreateNegocioDto` y `soporteUrl` HTTPS opcional); se permiten varias solicitudes históricas pero solo una pendiente por usuario. El admin usa `GET /solicitudes-negocio?estado=pendiente&page=1&limit=20`, `PATCH /solicitudes-negocio/:id/aprobar` o `PATCH /solicitudes-negocio/:id/rechazar` con `{ "motivo": "..." }`. La aprobación crea en una transacción el negocio verificado y actualiza el rol. `GET /solicitudes-negocio/mias` muestra el historial propio.
+
+La ficha admite `descripcion` (máximo 1000 caracteres), `direccion`, enlaces HTTPS `sitioWeb` y `logoUrl`, además de `instagram` y `facebook`. Reemplaza horarios usando `PUT /negocios/:id/horarios`:
+
+```json
+{
+  "horarios": [
+    { "diaSemana": 2, "horaApertura": "09:00", "horaCierre": "18:00" }
+  ]
+}
+```
+
+`diaSemana` usa 0 para domingo y 6 para sábado. `GET /negocios/cercanos` admite `abiertoAhora=true`; evalúa el horario con la hora de `America/Bogota`. `GET /negocios/:id/calificacion` devuelve `{ "promedio": 4.5, "total": 12 }` contando solo reseñas visibles.
+
+## Reseñas, auditoría y publicidad
+
+Una reseña debe incluir exactamente uno de `idSitio` o `idNegocio`. Los dueños no pueden reseñar su propio negocio. `GET /resenas` y las calificaciones excluyen estados distintos de `visible`. Un usuario autenticado puede reportar con `POST /resenas/:id/reportar` y `{ "motivo": "ofensiva" }` (también `falsa` o `spam`). Al tercer reporte, la reseña pasa a `en_revision`; el admin revisa `GET /resenas/en-revision` y decide mediante `PATCH /resenas/:id/moderar` con `{ "estado": "visible" }` o `{ "estado": "oculta" }`.
+
+El endpoint administrativo paginado `GET /auditoria` acepta `accion`, `entidad`, `idUsuario`, `desde` y `hasta`; conserva quién realizó cada operación, la entidad, el detalle JSON, la IP disponible y la fecha, nunca contraseñas ni tokens.
+
+Cada campaña incluida en `GET /publicidades/activas` suma una impresión. El endpoint público `POST /publicidades/:id/clic` registra clics y limita a 10 solicitudes por minuto por IP. El dueño de la campaña o un admin consulta `GET /publicidades/:id/metricas`, que devuelve `impresiones`, `clics` y `ctr` (clics / impresiones × 100; cero si no hay impresiones).
+
 ## Búsqueda y paginación
 
 Los listados de zonas, sitios, categorías, negocios, servicios, tarifas, reseñas y publicidades devuelven `{ data, total, page, limit, totalPages }`. `page` inicia en 1, `limit` en 20 y el máximo permitido es 100. Sitios y negocios aceptan `idZona` y `q`; las reseñas aceptan `idSitio`. Las publicidades activas conservan el filtro de vigencia.

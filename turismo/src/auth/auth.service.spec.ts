@@ -21,6 +21,7 @@ import { Visita } from '../visita/entities/visita.entity';
 import { Resena } from '../resena/entities/resena.entity';
 import { Negocio } from '../negocio/entities/negocio.entity';
 import { SitioTuristico } from '../sitio-turistico/entities/sitio-turistico.entity';
+import { AuditoriaService } from '../auditoria/auditoria.service';
 
 describe('User registration and authentication', () => {
   let authService: AuthService;
@@ -125,6 +126,7 @@ describe('User registration and authentication', () => {
         { provide: ConfigService, useValue: configService },
         { provide: DataSource, useValue: dataSource },
         { provide: AuthMailService, useValue: { sendPasswordReset: vi.fn() } },
+        { provide: AuditoriaService, useValue: { registrar: vi.fn() } },
       ],
     }).compile();
 

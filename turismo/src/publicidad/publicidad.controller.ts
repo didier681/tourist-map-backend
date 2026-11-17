@@ -32,6 +32,7 @@ import { Publicidad } from './entities/publicidad.entity';
 import { PublicidadService } from './publicidad.service';
 import { PaginationQueryDto } from '../common/pagination/pagination-query.dto';
 import { PaginatedResult } from '../common/pagination/paginated-result';
+import { Throttle } from '@nestjs/throttler';
 
 @Controller('publicidades')
 @ApiTags('Publicidad')
@@ -78,6 +79,25 @@ export class PublicidadController {
     @Query() query: PaginationQueryDto,
   ): Promise<PaginatedResult<Publicidad>> {
     return this.publicidadService.findActivas(query);
+  }
+
+  @Post(':id/clic')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Registrar un clic en una campaña activa' })
+  click(@Param('id', ParseIntPipe) id: number) {
+    return this.publicidadService.registerClick(id);
+  }
+
+  @Get(':id/metricas')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Consultar impresiones, clics y CTR de una campaña propia' })
+  metrics(
+    @Param('id', ParseIntPipe) id: number,
+    @GetUser() user: User,
+  ) {
+    return this.publicidadService.metrics(id, user);
   }
 
   // Devuelve todas las publicidades y sus referencias.

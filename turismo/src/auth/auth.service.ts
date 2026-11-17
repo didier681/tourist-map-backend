@@ -25,6 +25,7 @@ import { RefreshToken } from './entities/refresh-token.entity';
 import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { AuthMailService } from './mail.service';
 import { assertPasswordPolicy } from '../common/password-policy';
+import { AuditoriaService } from '../auditoria/auditoria.service';
 
 type TokenPair = { token: string; refreshToken: string };
 
@@ -40,6 +41,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly dataSource: DataSource,
     private readonly mailService: AuthMailService,
+    private readonly auditoriaService: AuditoriaService,
   ) {}
 
   // Registra el consentimiento antes de crear cualquier sesión renovable.
@@ -244,6 +246,7 @@ export class AuthService {
   async deleteAccount(
     id: number,
     passwordActual: string,
+    ip?: string,
   ): Promise<{ message: string }> {
     const user = await this.userService.findByIdWithPassword(id);
     if (!user || !(await bcrypt.compare(passwordActual, user.passwordHash))) {
@@ -271,6 +274,16 @@ export class AuthService {
       );
       await manager.getRepository(RefreshToken).delete({ idUsuario: id });
       await manager.getRepository(PasswordResetToken).delete({ idUsuario: id });
+      await this.auditoriaService.registrar(
+        {
+          idUsuario: id,
+          accion: 'eliminacion_cuenta',
+          entidad: 'usuario',
+          idEntidad: id,
+          ip,
+        },
+        manager,
+      );
       await manager.getRepository(User).delete({ id });
     });
 

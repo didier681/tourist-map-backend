@@ -13,12 +13,20 @@ import { Servicio } from '../../servicio/entities/servicio.entity';
 import { Zona } from '../../zona/entities/zona.entity';
 import { User } from '../../user/entities/user.entity';
 import { Exclude } from 'class-transformer';
+import { HorarioNegocio } from './horario-negocio.entity';
 
 // Niveles de membresía permitidos para un negocio.
 export enum EstadoMembresia {
   Gratis = 'gratis',
   Basico = 'basico',
   Premium = 'premium',
+}
+
+export enum EstadoVerificacion {
+  Pendiente = 'pendiente',
+  Verificado = 'verificado',
+  Rechazado = 'rechazado',
+  Suspendido = 'suspendido',
 }
 
 // Negocio que siempre pertenece a una zona, asociado opcionalmente a un sitio turístico.
@@ -62,6 +70,24 @@ export class Negocio {
   @Column({ type: 'varchar', length: 255, name: 'nombre_comercial' })
   nombreComercial: string;
 
+  @Column({ type: 'text', nullable: true })
+  descripcion: string | null;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  direccion: string | null;
+
+  @Column({ type: 'varchar', length: 2048, name: 'sitio_web', nullable: true })
+  sitioWeb: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  instagram: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  facebook: string | null;
+
+  @Column({ type: 'varchar', length: 2048, name: 'logo_url', nullable: true })
+  logoUrl: string | null;
+
   // NIT u otro documento de identificación del negocio.
   // Los datos fiscales no son necesarios para consultar el catálogo público.
   @Exclude({ toPlainOnly: true })
@@ -84,6 +110,18 @@ export class Negocio {
   @Column({ type: 'varchar', length: 255 })
   email: string;
 
+  // La verificación explícita evita publicar datos comerciales aún no revisados.
+  @Column({
+    type: 'enum',
+    enum: EstadoVerificacion,
+    name: 'estado_verificacion',
+    default: EstadoVerificacion.Pendiente,
+  })
+  estadoVerificacion: EstadoVerificacion;
+
+  @Column({ type: 'text', name: 'motivo_rechazo', nullable: true })
+  motivoRechazo: string | null;
+
   // Nivel de membresía; si no se indica, inicia como gratis.
   @Column({
     type: 'enum',
@@ -103,4 +141,7 @@ export class Negocio {
   // Servicios ofrecidos por este negocio.
   @OneToMany(() => Servicio, (servicio) => servicio.negocio)
   servicios: Servicio[];
+
+  @OneToMany(() => HorarioNegocio, (horario) => horario.negocio)
+  horarios: HorarioNegocio[];
 }
