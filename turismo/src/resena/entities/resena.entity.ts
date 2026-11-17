@@ -17,19 +17,23 @@ export class Resena {
   @PrimaryGeneratedColumn({ name: 'id_resena' })
   idResena: number;
 
-  @Column({ type: 'int', name: 'id_usuario' })
-  idUsuario: number;
+  @Column({ type: 'int', name: 'id_usuario', nullable: true })
+  idUsuario: number | null;
 
-  // Autor de la reseña, asociado a la entidad User de la aplicación.
-  // Las reseñas nunca revelan correo ni documentos del autor.
+  // Mantiene la calificación al eliminar la cuenta y sustituye los datos del autor por anonimato.
   @Transform(
     ({ value }: { value: User | null }) =>
-      value ? { id: value.id, nombre: value.nombre } : value,
+      value
+        ? { id: value.id, nombre: value.nombre }
+        : { id: null, nombre: 'Usuario eliminado' },
     { toPlainOnly: true },
   )
-  @ManyToOne(() => User, (usuario) => usuario.resenas, { nullable: false })
+  @ManyToOne(() => User, (usuario) => usuario.resenas, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
   @JoinColumn({ name: 'id_usuario', referencedColumnName: 'id' })
-  usuario: User;
+  usuario: User | null;
 
   @Column({ type: 'int', name: 'id_sitio' })
   idSitio: number;

@@ -23,6 +23,8 @@ import { User } from './entities/user.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { UpdateAccountStateDto } from './dto/update-account-state.dto';
+import { GetUser } from '../auth/decorators/get-user.decorator';
 
 // Los guards y el rol aplican a todas las rutas del controlador
 @Controller('users')
@@ -74,6 +76,20 @@ export class UserController {
   @Patch(':id/activar')
   activate(@Param('id', ParseIntPipe) id: number): Promise<User> {
     return this.userService.activate(id);
+  }
+
+  @Patch(':id/estado')
+  updateAccountState(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateAccountStateDto,
+    @GetUser() admin: User,
+  ): Promise<User> {
+    return this.userService.updateAccountState(
+      id,
+      dto.isActive,
+      dto.motivo,
+      admin.id,
+    );
   }
 
   @Delete(':id')

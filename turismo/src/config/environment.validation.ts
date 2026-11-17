@@ -14,7 +14,16 @@ export const environmentValidationSchema = Joi.object({
   DB_PASSWORD: Joi.string().allow('').required(),
   DB_DATABASE: Joi.string().required(),
   JWT_SECRET: Joi.string().min(32).required(),
-  JWT_EXPIRATION: Joi.string().default('1h'),
+  JWT_EXPIRATION: Joi.string().default('15m'),
+  JWT_REFRESH_SECRET: Joi.string().min(32).required(),
+  JWT_REFRESH_EXPIRATION: Joi.string().default('7d'),
+  TERMS_VERSION: Joi.string().trim().min(1).max(50).default('1.0'),
+  FRONTEND_URL: Joi.string().uri({ scheme: ['http', 'https'] }).default('http://localhost:3000'),
+  SMTP_HOST: Joi.string().optional(),
+  SMTP_PORT: Joi.number().port().optional(),
+  SMTP_USER: Joi.string().optional(),
+  SMTP_PASS: Joi.string().optional(),
+  MAIL_FROM: Joi.string().email().optional(),
   CORS_ORIGINS: Joi.string()
     .allow('')
     .default('')
@@ -47,12 +56,21 @@ export const environmentValidationSchema = Joi.object({
   ADMIN_NOMBRE: Joi.string(),
 })
   .unknown(true)
+  .with('SMTP_HOST', ['SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'MAIL_FROM'])
+  .with('SMTP_PORT', ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'MAIL_FROM'])
+  .with('SMTP_USER', ['SMTP_HOST', 'SMTP_PORT', 'SMTP_PASS', 'MAIL_FROM'])
+  .with('SMTP_PASS', ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'MAIL_FROM'])
+  .with('MAIL_FROM', ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS'])
   .custom((value: Record<string, unknown>, helpers: Joi.CustomHelpers) => {
     if (value.NODE_ENV === 'production' && value.DB_SYNCHRONIZE === true) {
       return helpers.error('any.invalid');
+    }
+    if (value.JWT_SECRET === value.JWT_REFRESH_SECRET) {
+      return helpers.error('any.custom');
     }
     return value;
   })
   .messages({
     'any.invalid': 'DB_SYNCHRONIZE debe ser false en producción',
+    'any.custom': 'JWT_REFRESH_SECRET debe ser distinto de JWT_SECRET',
   });

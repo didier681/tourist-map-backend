@@ -70,9 +70,17 @@ La API estará disponible en `http://localhost:3000` (o en el puerto definido po
 Swagger solo está disponible cuando `SWAGGER_ENABLED=true`; con el servidor en ejecución, abre [http://localhost:3000/api/docs](http://localhost:3000/api/docs). Para probar rutas protegidas:
 
 1. Regístrate o inicia sesión en los endpoints de autenticación.
-2. Copia el valor `token` de la respuesta.
+2. Copia `token` (access token, recomendado 15 minutos) y conserva `refreshToken` de forma segura.
 3. Pulsa **Authorize** en Swagger y pega solo el token, sin escribir el prefijo `Bearer`; Swagger lo añade automáticamente.
 4. Pulsa **Authorize** y cierra el diálogo. Swagger enviará el token en las solicitudes protegidas.
+
+El access token se renueva con `POST /auth/refresh` enviando `{ "refreshToken": "..." }`. Cada refresh token es de un solo uso: la respuesta entrega un nuevo par y su reutilización revoca todas las sesiones de la cuenta. Para cerrar sesión, llama `POST /auth/logout` con el refresh token vigente.
+
+Para recuperar el acceso, llama `POST /auth/forgot-password` con `{ "email": "usuario@ejemplo.com" }`. La respuesta es siempre genérica. El enlace recibido conduce a `POST /auth/reset-password` con `{ "token": "...", "nuevaPassword": "ClaveSegura123" }`; el cambio invalida las sesiones existentes. `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` y `MAIL_FROM` permiten enviar el correo. Sin SMTP, en desarrollo el enlace se registra en el log; en producción no se expone el enlace.
+
+El titular puede editar nombre e idioma en `PATCH /auth/me`, cambiar contraseña en `PATCH /auth/me/password` y eliminar su cuenta en `DELETE /auth/me` (requiere contraseña actual; los negocios deben transferirse o eliminarse primero). Las reseñas permanecen con autor “Usuario eliminado”. Aceptar los términos con `aceptaTerminos: true` es requisito para registrarse; se guarda `TERMS_VERSION`.
+
+El personal administrador puede suspender o reactivar usuarios con `PATCH /users/:id/estado` y `{ "isActive": false, "motivo": "..." }`. Un administrador no puede suspender su propia cuenta; las sesiones renovables se revocan al suspender.
 
 ## Roles
 
@@ -140,7 +148,12 @@ npm run build     # Compilación
 | `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE` | Sí | Conexión a MySQL/MariaDB. Se admite una contraseña de base de datos vacía. |
 | `DB_SYNCHRONIZE` | No | Habilita sincronización fuera de producción; por defecto `false` y siempre se rechaza en producción. |
 | `JWT_SECRET` | Sí | Secreto de firma JWT de al menos 32 caracteres. |
-| `JWT_EXPIRATION` | No | Vigencia del token; por defecto `1h`. |
+| `JWT_EXPIRATION` | No | Vigencia del access token; por defecto `15m`. |
+| `JWT_REFRESH_SECRET` | Sí | Secreto independiente, de al menos 32 caracteres, para refresh tokens. |
+| `JWT_REFRESH_EXPIRATION` | No | Vigencia del refresh token; por defecto `7d`. |
+| `TERMS_VERSION` | No | Versión vigente de términos; por defecto `1.0`. |
+| `FRONTEND_URL` | No | URL base del frontend para construir enlaces de recuperación. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | No | Deben configurarse juntos para el envío de correos de recuperación. |
 | `CORS_ORIGINS` | No | Orígenes HTTP/HTTPS separados por comas. Vacío permite localhost solo en desarrollo. |
 | `SWAGGER_ENABLED` | No | Publica Swagger solo con `true`; por defecto `false`. |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NOMBRE` | Solo para seed | Datos del administrador inicial; la contraseña requiere 10 caracteres, mayúscula, minúscula y número. |

@@ -7,6 +7,7 @@ const requiredEnvironment = {
   DB_PASSWORD: '',
   DB_DATABASE: 'turismo',
   JWT_SECRET: 'secreto-de-prueba-con-32-caracteres-minimo',
+  JWT_REFRESH_SECRET: 'otro-secreto-de-prueba-con-32-caracteres-minimo',
 };
 
 describe('environmentValidationSchema', () => {
@@ -25,8 +26,17 @@ describe('environmentValidationSchema', () => {
       ...requiredEnvironment,
       JWT_SECRET: 'demasiado-corto',
     });
-
     expect(error).toBeDefined();
+  });
+
+  it('exige un secreto de refresh distinto al secreto de acceso', () => {
+    const { error } = environmentValidationSchema.validate({
+      ...requiredEnvironment,
+      JWT_REFRESH_SECRET: requiredEnvironment.JWT_SECRET,
+    });
+    expect(error?.message).toContain(
+      'JWT_REFRESH_SECRET debe ser distinto de JWT_SECRET',
+    );
   });
 
   it('rechaza sincronización de esquema en producción', () => {

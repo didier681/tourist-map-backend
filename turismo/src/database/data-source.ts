@@ -19,6 +19,8 @@ import { Servicio } from '../servicio/entities/servicio.entity';
 import { Tarifa } from '../tarifa/entities/tarifa.entity';
 import { Publicidad } from '../publicidad/entities/publicidad.entity';
 import { Multimedia } from '../multimedia/entities/multimedia.entity';
+import { RefreshToken } from '../auth/entities/refresh-token.entity';
+import { PasswordResetToken } from '../auth/entities/password-reset-token.entity';
 
 loadEnvironment();
 
@@ -56,6 +58,8 @@ const entities = [
   Tarifa,
   Publicidad,
   Multimedia,
+  RefreshToken,
+  PasswordResetToken,
 ];
 
 export default new DataSource({

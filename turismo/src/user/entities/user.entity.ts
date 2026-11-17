@@ -76,6 +76,22 @@ export class User {
   @Column({ type: 'varchar', length: 10, name: 'idioma_pref', default: 'es' })
   idiomaPref: string;
 
+  // Conserva evidencia de cuándo y bajo qué versión se aceptaron los términos.
+  @Column({
+    type: 'datetime',
+    name: 'fecha_aceptacion_terminos',
+    nullable: true,
+  })
+  fechaAceptacionTerminos: Date | null;
+
+  @Column({
+    type: 'varchar',
+    length: 50,
+    name: 'version_terminos',
+    nullable: true,
+  })
+  versionTerminos: string | null;
+
   // Fecha y hora de registro generadas automáticamente al crear la cuenta.
   @CreateDateColumn({ type: 'timestamp', name: 'fecha_registro' })
   fechaRegistro: Date;

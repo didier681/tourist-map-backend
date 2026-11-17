@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User, UserRole } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -16,6 +16,7 @@ import { AssignGestorZonasDto } from './dto/assign-gestor-zonas.dto';
 import { GestorZona } from '../gestor-zona/entities/gestor-zona.entity';
 import { Zona } from '../zona/entities/zona.entity';
 import { assertPasswordPolicy } from '../common/password-policy';
+import { RefreshToken } from '../auth/entities/refresh-token.entity';
 
 @Injectable()
 // Contiene las reglas de negocio y el acceso a persistencia de usuarios.
@@ -33,12 +34,16 @@ export class UserService {
     private readonly gestorZonaRepository: Repository<GestorZona>,
     @InjectRepository(Zona)
     private readonly zonaRepository: Repository<Zona>,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
    * Crea una cuenta, comprueba el correo y guarda la contraseña como hash.
    */
-  async create(createUserDto: CreateUserDto): Promise<User> {
+  async create(
+    createUserDto: CreateUserDto,
+    terms?: { fechaAceptacionTerminos: Date; versionTerminos: string },
+  ): Promise<User> {
     assertPasswordPolicy(createUserDto.password);
     if (createUserDto.role === UserRole.Gestor) {
       throw new BadRequestException(
@@ -65,6 +70,8 @@ export class UserService {
       role: createUserDto.role ?? UserRole.Usuario,
       documentoIdentidad: createUserDto.documentoIdentidad ?? null,
       soporteUrl: createUserDto.soporteUrl ?? null,
+      fechaAceptacionTerminos: terms?.fechaAceptacionTerminos ?? null,
+      versionTerminos: terms?.versionTerminos ?? null,
     });
 
     // Persiste la cuenta y devuelve la entidad creada.
@@ -164,6 +171,53 @@ export class UserService {
    */
   async findById(id: number): Promise<User | null> {
     return await this.userRepository.findOneBy({ id });
+  }
+
+  // Carga el hash solo en flujos que verifican la contraseña actual del titular.
+  async findByIdWithPassword(id: number): Promise<User | null> {
+    return await this.userRepository.findOne({
+      where: { id },
+      select: { id: true, passwordHash: true, isActive: true },
+    });
+  }
+
+  // Actualiza exclusivamente las preferencias del titular, sin aceptar datos administrativos.
+  async updateMyProfile(
+    id: number,
+    changes: { nombre?: string; idiomaPref?: string },
+  ): Promise<User> {
+    const user = await this.findOne(id);
+    this.userRepository.merge(user, changes);
+    return await this.userRepository.save(user);
+  }
+
+  // Suspende o reactiva una cuenta; la revocación invalida todas sus sesiones renovables.
+  async updateAccountState(
+    id: number,
+    isActive: boolean,
+    motivo?: string,
+    adminId?: number,
+  ): Promise<User> {
+    if (!isActive && id === adminId) {
+      throw new BadRequestException('No puedes suspender tu propia cuenta');
+    }
+    const user = await this.findOne(id);
+    // Guarda suspensión y revocación en una sola transacción para no dejar sesiones renovables.
+    await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(User).update({ id }, { isActive });
+      if (!isActive) {
+        await manager.getRepository(RefreshToken).update(
+          { idUsuario: id, revocado: false },
+          { revocado: true },
+        );
+      }
+    });
+    user.isActive = isActive;
+    // El motivo ayuda a auditar la acción, pero nunca sustituye el estado persistido.
+    this.logger.warn(
+      `Cuenta ${id} ${isActive ? 'reactivada' : 'suspendida'}${motivo ? `: ${motivo}` : ''}`,
+    );
+    return user;
   }
 
   /**
