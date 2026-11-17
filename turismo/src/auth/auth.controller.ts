@@ -9,6 +9,7 @@ import {
   SerializeOptions,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -27,6 +28,8 @@ export class AuthController {
    * Registrar un nuevo usuario (responde 201 Created)
    */
   @Post('register')
+  // Reduce intentos de creación masiva de cuentas por IP.
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
    // El grupo propio permite devolver solo los datos sensibles de quien se registra.
    @SerializeOptions({ groups: ['propio'] })
    register(@Body() registerDto: RegisterDto): Promise<AuthResponse> {
@@ -38,6 +41,8 @@ export class AuthController {
    * Iniciar sesión (responde 200 OK, no se crea ningún recurso)
    */
   @Post('login')
+  // Reduce intentos automatizados de adivinar credenciales.
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(HttpStatus.OK)
   // El grupo propio entrega datos del titular sin habilitar campos en otras rutas.
   @SerializeOptions({ groups: ['propio'] })

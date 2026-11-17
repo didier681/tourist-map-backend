@@ -69,7 +69,7 @@ describe('User registration and authentication', () => {
   it('registers with a password hash and logs in using the original password', async () => {
     const credentials: RegisterDto = {
       email: 'viajero@example.com',
-      password: 'clave-segura-123',
+      password: 'Clave-segura-123',
       nombre: 'Viajero',
       idiomaPref: 'es',
     };
@@ -120,7 +120,7 @@ describe('User registration and authentication', () => {
     ]) {
       const registration = plainToInstance(RegisterDto, {
         email: 'viajero@example.com',
-        password: 'clave-segura-123',
+        password: 'Clave-segura-123',
         nombre: 'Viajero',
         ...fields,
       });
@@ -133,7 +133,7 @@ describe('User registration and authentication', () => {
 
     const invalidUser = plainToInstance(CreateUserDto, {
       email: 'viajero@example.com',
-      password: 'clave-segura-123',
+      password: 'Clave-segura-123',
       nombre: 'Viajero',
       role: 'superadmin',
     });

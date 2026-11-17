@@ -31,7 +31,7 @@ Córdoba Cerca es una API de turismo para el departamento de Córdoba. Permite c
    npm install
    ```
 
-3. Copia `.env.example` como `.env` y configura las credenciales de la base de datos, el secreto JWT y los datos del administrador inicial.
+3. Copia `.env.example` como `.env` y configura las credenciales de la base de datos, el secreto JWT y, si vas a ejecutar el seed, los datos del administrador inicial.
 
    ```bash
    cp .env.example .env
@@ -45,23 +45,29 @@ Córdoba Cerca es una API de turismo para el departamento de Córdoba. Permite c
    CREATE DATABASE turismo;
    ```
 
-5. Crea el usuario administrador inicial. El comando no duplica el usuario si el correo ya existe:
+5. Ejecuta las migraciones para crear todas las tablas. En producción, la aplicación también las ejecuta al arrancar:
+
+   ```bash
+   npm run migration:run
+   ```
+
+6. Crea el usuario administrador inicial. El comando no duplica el usuario si el correo ya existe:
 
    ```bash
    npm run seed
    ```
 
-6. Inicia el servidor en modo desarrollo:
+7. Inicia el servidor en modo desarrollo:
 
    ```bash
    npm run start:dev
    ```
 
-La API estará disponible en `http://localhost:3000` (o en el puerto definido por `PORT`).
+La API estará disponible en `http://localhost:3000` (o en el puerto definido por `PORT`). El seed se debe ejecutar después de las migraciones.
 
 ## Documentación y autenticación
 
-Con el servidor en ejecución, abre Swagger en [http://localhost:3000/api/docs](http://localhost:3000/api/docs). Para probar rutas protegidas:
+Swagger solo está disponible cuando `SWAGGER_ENABLED=true`; con el servidor en ejecución, abre [http://localhost:3000/api/docs](http://localhost:3000/api/docs). Para probar rutas protegidas:
 
 1. Regístrate o inicia sesión en los endpoints de autenticación.
 2. Copia el valor `token` de la respuesta.
@@ -95,7 +101,7 @@ Las rutas de escritura requieren autenticación y aplican permisos por rol y, cu
 ## Reglas de negocio principales
 
 - El registro público siempre crea usuarios con rol `usuario`; no permite asignar un rol privilegiado.
-- Las contraseñas se almacenan cifradas con bcrypt. El inicio de sesión requiere credenciales válidas y una cuenta activa.
+- Las contraseñas nuevas deben tener al menos 10 caracteres, mayúscula, minúscula y número, y se almacenan cifradas con bcrypt. Esta regla no se aplica al login para conservar el acceso de cuentas existentes.
 - El correo y el documento de identidad deben ser únicos. Los gestores se crean inactivos y requieren aprobación; sus zonas se asignan explícitamente.
 - Una persona usuaria solo puede publicar una reseña por sitio.
 - Las coordenadas de los negocios deben estar dentro de los rangos geográficos válidos.
@@ -111,3 +117,27 @@ npm run test:e2e  # Pruebas de extremo a extremo
 npm run lint      # Análisis estático
 npm run build     # Compilación
 ```
+
+## Variables de entorno y despliegue
+
+| Variable | Obligatoria | Descripción |
+| --- | --- | --- |
+| `NODE_ENV` | No | `development`, `production` o `test`; por defecto `development`. |
+| `PORT` | No | Puerto HTTP; por defecto `3000`. |
+| `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE` | Sí | Conexión a MySQL/MariaDB. Se admite una contraseña de base de datos vacía. |
+| `DB_SYNCHRONIZE` | No | Habilita sincronización fuera de producción; por defecto `false` y siempre se rechaza en producción. |
+| `JWT_SECRET` | Sí | Secreto de firma JWT de al menos 32 caracteres. |
+| `JWT_EXPIRATION` | No | Vigencia del token; por defecto `1h`. |
+| `CORS_ORIGINS` | No | Orígenes HTTP/HTTPS separados por comas. Vacío permite localhost solo en desarrollo. |
+| `SWAGGER_ENABLED` | No | Publica Swagger solo con `true`; por defecto `false`. |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NOMBRE` | Solo para seed | Datos del administrador inicial; la contraseña requiere 10 caracteres, mayúscula, minúscula y número. |
+
+En desarrollo, las migraciones se ejecutan manualmente y `DB_SYNCHRONIZE` es `false` por defecto. Si se activa la sincronización local, nunca debe usarse con `NODE_ENV=production`. En producción, configure `NODE_ENV=production`, `DB_SYNCHRONIZE=false` y orígenes CORS explícitos; el servidor ejecutará las migraciones pendientes al iniciar y Swagger permanecerá oculto salvo habilitación explícita.
+
+Para crear una migración después de cambiar entidades, indique un nombre:
+
+```bash
+npm run migration:generate -- src/database/migrations/NombreDelCambio
+```
+
+Use `npm run migration:run` para aplicarlas y `npm run migration:revert` para revertir la última migración aplicada.

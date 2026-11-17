@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -18,6 +19,8 @@ import { User, UserRole } from '../user/entities/user.entity';
 @Injectable()
 // Gestiona negocios, que siempre pertenecen a una zona y pueden asociarse a un sitio.
 export class NegocioService {
+  private readonly logger = new Logger(NegocioService.name);
+
   // Inyecta repositorios para validar la zona obligatoria y el sitio opcional.
   constructor(
     @InjectRepository(Negocio)
@@ -129,8 +132,13 @@ export class NegocioService {
     if (!negocio) {
       throw new NotFoundException(`Negocio con ID ${id} no encontrado`);
     }
+    const estadoAnterior = negocio.estadoMembresia;
     negocio.estadoMembresia = estadoMembresia;
     await this.negocioRepository.save(negocio);
+    // Conserva una traza de auditoría de cada cambio administrativo de membresía.
+    this.logger.log(
+      `Membresía del negocio ${id}: ${estadoAnterior} -> ${estadoMembresia}`,
+    );
     return await this.findOne(id);
   }
 

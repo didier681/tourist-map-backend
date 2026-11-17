@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UserService } from '../user/user.service';
@@ -11,6 +11,8 @@ import { AuthResponse, AuthUser } from './interfaces/auth-response.interface';
 @Injectable()
 // Coordina el registro, el inicio de sesión y la validación de tokens.
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   // Recibe los servicios de usuarios y firma JWT.
   constructor(
     private readonly userService: UserService,
@@ -34,6 +36,8 @@ export class AuthService {
 
     // Usa un error genérico para no revelar si el email está registrado.
     if (!user) {
+      // Solo registra el identificador de cuenta; jamás se escribe la contraseña en logs.
+      this.logger.warn(`Intento de login fallido para el email ${email}`);
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
@@ -44,11 +48,15 @@ export class AuthService {
     );
 
     if (!isPasswordValid) {
+      // Permite detectar intentos reiterados sin exponer el secreto enviado.
+      this.logger.warn(`Intento de login fallido para el email ${email}`);
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
     // Comprueba el estado después de validar credenciales para no revelar cuentas ajenas.
     if (!user.isActive) {
+      // También deja rastro de intentos sobre cuentas inactivas sin registrar credenciales.
+      this.logger.warn(`Intento de login fallido para el email ${email}`);
       throw new UnauthorizedException('Usuario inactivo');
     }
 

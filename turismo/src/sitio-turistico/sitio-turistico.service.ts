@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -30,6 +31,8 @@ import { Resena } from '../resena/entities/resena.entity';
 @Injectable()
 // Gestiona sitios turísticos, sugerencias de la comunidad y su moderación.
 export class SitioTuristicoService {
+  private readonly logger = new Logger(SitioTuristicoService.name);
+
   constructor(
     @InjectRepository(SitioTuristico)
     private readonly sitioRepository: Repository<SitioTuristico>,
@@ -199,7 +202,10 @@ export class SitioTuristicoService {
     await this.assertCanManageZone(sitio.idZona, user);
     sitio.estadoRevision = EstadoRevision.Aprobado;
     sitio.motivoRechazo = null;
-    return await this.sitioRepository.save(sitio);
+    const aprobado = await this.sitioRepository.save(sitio);
+    // Identifica la sugerencia y al responsable para auditar la moderación.
+    this.logger.log(`Sugerencia ${id} aprobada por el usuario ${user.id}`);
+    return aprobado;
   }
 
   // Rechaza una sugerencia y guarda el motivo obligatorio de la decisión.
@@ -212,7 +218,10 @@ export class SitioTuristicoService {
     await this.assertCanManageZone(sitio.idZona, user);
     sitio.estadoRevision = EstadoRevision.Rechazado;
     sitio.motivoRechazo = dto.motivoRechazo;
-    return await this.sitioRepository.save(sitio);
+    const rechazado = await this.sitioRepository.save(sitio);
+    // Registra el rechazo sin repetir el motivo, que puede contener datos aportados por usuarios.
+    this.logger.log(`Sugerencia ${id} rechazada por el usuario ${user.id}`);
+    return rechazado;
   }
 
   // Registra una única confirmación por usuario y actualiza el contador en transacción.

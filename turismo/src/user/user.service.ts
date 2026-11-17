@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   ConflictException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -14,10 +15,13 @@ import { CreateGestorDto } from './dto/create-gestor.dto';
 import { AssignGestorZonasDto } from './dto/assign-gestor-zonas.dto';
 import { GestorZona } from '../gestor-zona/entities/gestor-zona.entity';
 import { Zona } from '../zona/entities/zona.entity';
+import { assertPasswordPolicy } from '../common/password-policy';
 
 @Injectable()
 // Contiene las reglas de negocio y el acceso a persistencia de usuarios.
 export class UserService {
+  private readonly logger = new Logger(UserService.name);
+
   // Número de rondas usado para generar hashes de contraseñas con bcrypt.
   private readonly saltRounds = 10;
 
@@ -35,6 +39,7 @@ export class UserService {
    * Crea una cuenta, comprueba el correo y guarda la contraseña como hash.
    */
   async create(createUserDto: CreateUserDto): Promise<User> {
+    assertPasswordPolicy(createUserDto.password);
     if (createUserDto.role === UserRole.Gestor) {
       throw new BadRequestException(
         'Los gestores deben crearse mediante POST /users/gestores',
@@ -68,6 +73,7 @@ export class UserService {
 
   // Crea un gestor inactivo; el administrador debe activarlo explícitamente.
   async createGestor(createGestorDto: CreateGestorDto): Promise<User> {
+    assertPasswordPolicy(createGestorDto.password);
     await this.assertIdentityAvailable(
       createGestorDto.email,
       createGestorDto.documentoIdentidad,
@@ -85,7 +91,10 @@ export class UserService {
       role: UserRole.Gestor,
       isActive: false,
     });
-    return await this.userRepository.save(user);
+    const gestor = await this.userRepository.save(user);
+    // Registra la creación para auditoría sin incluir credenciales.
+    this.logger.log(`Gestor creado: ${gestor.email} (ID ${gestor.id})`);
+    return gestor;
   }
 
   // Añade zonas a un gestor y evita crear asignaciones duplicadas.
@@ -226,9 +235,11 @@ export class UserService {
     const { password, ...changes } = updateUserDto;
 
     // Calcula el nuevo hash únicamente cuando se envía una contraseña.
-    const passwordHash = password
-      ? await bcrypt.hash(password, this.saltRounds)
-      : undefined;
+    let passwordHash: string | undefined;
+    if (password) {
+      assertPasswordPolicy(password);
+      passwordHash = await bcrypt.hash(password, this.saltRounds);
+    }
 
     // Aplica los campos validados y asigna el hash por separado.
     this.userRepository.merge(user, changes);

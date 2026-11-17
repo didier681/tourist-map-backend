@@ -6,10 +6,15 @@ import {
   IsString,
   IsUrl,
   MaxLength,
+  Matches,
   MinLength,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { UserRole } from '../entities/user.entity';
+import {
+  PASSWORD_PATTERN,
+  PASSWORD_POLICY_MESSAGE,
+} from '../../common/password-policy';
 
 // Valida los datos permitidos para registrar o crear una cuenta de usuario.
 export class CreateUserDto {
@@ -26,15 +31,17 @@ export class CreateUserDto {
   email: string;
 
   @ApiProperty({
-    description: 'Contraseña de la cuenta; entre 6 y 72 caracteres.',
+    description:
+      'Contraseña de la cuenta; entre 10 y 72 caracteres, con mayúscula, minúscula y número.',
     example: 'ClaveSegura123',
-    minLength: 6,
+    minLength: 10,
     maxLength: 72,
   })
   // Rechaza contraseñas que no sean texto.
   @IsString({ message: 'La contraseña debe ser una cadena de texto' })
-  // Establece el mínimo requerido para aceptar la contraseña.
-  @MinLength(6, { message: 'La contraseña debe tener al menos 6 caracteres' })
+  // Exige longitud y diversidad de caracteres para dificultar contraseñas débiles.
+  @MinLength(10, { message: PASSWORD_POLICY_MESSAGE })
+  @Matches(PASSWORD_PATTERN, { message: PASSWORD_POLICY_MESSAGE })
   // Exige una contraseña para crear la cuenta.
   @IsNotEmpty({ message: 'La contraseña es obligatoria' })
   // Limita el tamaño soportado por bcrypt y evita entradas excesivas.
