@@ -50,7 +50,9 @@ export class CreateMultimediaDto {
     nullable: true,
   })
   // Permite omitir la URL; si se proporciona, debe tener formato válido.
-  @IsUrl()
+  @IsUrl({ protocols: ['https'], require_protocol: true }, {
+    message: 'urlContenido debe ser una URL HTTPS válida',
+  })
   @MaxLength(2048)
   @IsOptional()
   urlContenido?: string | null;
@@ -64,6 +66,9 @@ export class CreateMultimediaDto {
   // Permite omitir el texto; su obligatoriedad depende del tipo de contenido.
   @IsString()
   @IsNotEmpty()
+  @MaxLength(5000, {
+    message: 'textoContenido no puede superar los 5000 caracteres',
+  })
   @IsOptional()
   textoContenido?: string | null;
 

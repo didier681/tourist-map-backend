@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -29,6 +30,8 @@ import { CreatePublicidadDto } from './dto/create-publicidad.dto';
 import { UpdatePublicidadDto } from './dto/update-publicidad.dto';
 import { Publicidad } from './entities/publicidad.entity';
 import { PublicidadService } from './publicidad.service';
+import { PaginationQueryDto } from '../common/pagination/pagination-query.dto';
+import { PaginatedResult } from '../common/pagination/paginated-result';
 
 @Controller('publicidades')
 @ApiTags('Publicidad')
@@ -71,16 +74,20 @@ export class PublicidadController {
     status: HttpStatus.OK,
     description: 'Campañas activas con vigencia que incluye la fecha actual.',
   })
-  activas(): Promise<Publicidad[]> {
-    return this.publicidadService.findActivas();
+  activas(
+    @Query() query: PaginationQueryDto,
+  ): Promise<PaginatedResult<Publicidad>> {
+    return this.publicidadService.findActivas(query);
   }
 
   // Devuelve todas las publicidades y sus referencias.
   @Get()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  findAll(): Promise<Publicidad[]> {
-    return this.publicidadService.findAll();
+  findAll(
+    @Query() query: PaginationQueryDto,
+  ): Promise<PaginatedResult<Publicidad>> {
+    return this.publicidadService.findAll(query);
   }
 
   // Busca una publicidad por su identificador.

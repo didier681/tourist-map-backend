@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -33,6 +34,9 @@ import { UpdateSitioTuristicoDto } from './dto/update-sitio-turistico.dto';
 import { SugerirSitioTuristicoDto } from './dto/sugerir-sitio-turistico.dto';
 import { RechazarSitioTuristicoDto } from './dto/rechazar-sitio-turistico.dto';
 import { SitioTuristicoService } from './sitio-turistico.service';
+import { ProximityQueryDto } from '../common/geo/proximity-query.dto';
+import { SiteListQueryDto } from '../common/pagination/site-list-query.dto';
+import { PaginatedResult } from '../common/pagination/paginated-result';
 
 @Controller('sitios-turisticos')
 @ApiTags('SitioTuristico')
@@ -73,8 +77,16 @@ export class SitioTuristicoController {
   @Get()
   @ApiOperation({ summary: 'Listar sitios turísticos aprobados' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Sitios aprobados.' })
-  findAll(): Promise<SitioTuristico[]> {
-    return this.sitioService.findAll();
+  findAll(
+    @Query() query: SiteListQueryDto,
+  ): Promise<PaginatedResult<SitioTuristico>> {
+    return this.sitioService.findAll(query);
+  }
+
+  @Get('cercanos')
+  @ApiOperation({ summary: 'Buscar sitios turísticos activos por proximidad' })
+  cercanos(@Query() query: ProximityQueryDto) {
+    return this.sitioService.findNearby(query);
   }
 
   @Get('pendientes')

@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { Negocio } from '../negocio/entities/negocio.entity';
 import { SitioTuristico } from '../sitio-turistico/entities/sitio-turistico.entity';
 import { CreateMultimediaDto } from './dto/create-multimedia.dto';
@@ -16,6 +16,7 @@ import {
   TipoEntidadMultimedia,
 } from './entities/multimedia.entity';
 import { User, UserRole } from '../user/entities/user.entity';
+import { sanitizeText } from '../common/sanitize-text';
 
 @Injectable()
 // Gestiona contenido multimedia y valida su entidad polimórfica y formato.
@@ -28,32 +29,37 @@ export class MultimediaService {
     private readonly sitioRepository: Repository<SitioTuristico>,
     @InjectRepository(Negocio)
     private readonly negocioRepository: Repository<Negocio>,
+    private readonly dataSource: DataSource,
   ) {}
 
   // Valida la referencia y el contenido antes de crear el registro.
   async create(dto: CreateMultimediaDto, user: User): Promise<Multimedia> {
     await this.validateEntidad(dto.tipoEntidad, dto.idEntidad, user);
-    const cantidad = await this.multimediaRepository.countBy({
-      tipoEntidad: dto.tipoEntidad,
-      idEntidad: dto.idEntidad,
-    });
-    if (cantidad >= 10) {
-      throw new BadRequestException(
-        'No se pueden registrar más de 10 archivos multimedia por sitio o negocio',
-      );
-    }
     this.validateContenido(
       dto.tipoContenido,
       dto.urlContenido,
       dto.textoContenido,
     );
-    return await this.multimediaRepository.save(
-      this.multimediaRepository.create({
-        ...dto,
-        urlContenido: dto.urlContenido ?? null,
-        textoContenido: dto.textoContenido ?? null,
-      }),
-    );
+    return await this.dataSource.transaction(async (manager) => {
+      // Bloquea la entidad padre para serializar altas concurrentes de su multimedia.
+      await this.lockEntidad(manager, dto.tipoEntidad, dto.idEntidad);
+      const repository = manager.getRepository(Multimedia);
+      const cantidad = await repository.countBy({
+        tipoEntidad: dto.tipoEntidad,
+        idEntidad: dto.idEntidad,
+      });
+      this.assertQuota(cantidad);
+      return await repository.save(
+        repository.create({
+          ...dto,
+          urlContenido: dto.urlContenido ?? null,
+          textoContenido:
+            dto.textoContenido == null
+              ? null
+              : sanitizeText(dto.textoContenido),
+        }),
+      );
+    });
   }
 
   // Lista todos los registros multimedia.
@@ -115,29 +121,33 @@ export class MultimediaService {
         : dto.textoContenido;
 
     await this.validateEntidad(tipoEntidad, idEntidad, user);
-    if (
-      tipoEntidad !== multimedia.tipoEntidad ||
-      idEntidad !== multimedia.idEntidad
-    ) {
-      const cantidad = await this.multimediaRepository.countBy({
-        tipoEntidad,
-        idEntidad,
-      });
-      if (cantidad >= 10) {
-        throw new BadRequestException(
-          'No se pueden registrar más de 10 archivos multimedia por sitio o negocio',
-        );
-      }
-    }
     this.validateContenido(tipoContenido, urlContenido, textoContenido);
-    this.multimediaRepository.merge(multimedia, {
-      ...dto,
-      urlContenido:
-        dto.urlContenido === undefined ? undefined : dto.urlContenido,
-      textoContenido:
-        dto.textoContenido === undefined ? undefined : dto.textoContenido,
+    return await this.dataSource.transaction(async (manager) => {
+      const cambiandoEntidad =
+        tipoEntidad !== multimedia.tipoEntidad ||
+        idEntidad !== multimedia.idEntidad;
+      if (cambiandoEntidad) {
+        await this.lockEntidad(manager, tipoEntidad, idEntidad);
+        const cantidad = await manager.getRepository(Multimedia).countBy({
+          tipoEntidad,
+          idEntidad,
+        });
+        this.assertQuota(cantidad);
+      }
+      const repository = manager.getRepository(Multimedia);
+      repository.merge(multimedia, {
+        ...dto,
+        urlContenido:
+          dto.urlContenido === undefined ? undefined : dto.urlContenido,
+        textoContenido:
+          dto.textoContenido === undefined
+            ? undefined
+            : dto.textoContenido === null
+              ? null
+              : sanitizeText(dto.textoContenido),
+      });
+      return await repository.save(multimedia);
     });
-    return await this.multimediaRepository.save(multimedia);
   }
 
   // Elimina el registro multimedia indicado.
@@ -217,5 +227,29 @@ export class MultimediaService {
         'urlContenido es obligatoria cuando tipoContenido es imagen o video',
       );
     }
+  }
+
+  private assertQuota(cantidad: number): void {
+    if (cantidad >= 10) {
+      throw new BadRequestException(
+        'No se pueden registrar más de 10 archivos multimedia por sitio o negocio',
+      );
+    }
+  }
+
+  private async lockEntidad(
+    manager: EntityManager,
+    tipoEntidad: TipoEntidadMultimedia,
+    idEntidad: number,
+  ): Promise<void> {
+    const tabla =
+      tipoEntidad === TipoEntidadMultimedia.Sitio
+        ? { nombre: 'sitios_turisticos', columna: 'id_sitio' }
+        : { nombre: 'negocios', columna: 'id_negocio' };
+    // Los nombres SQL provienen de un enum cerrado; el ID sigue parametrizado.
+    await manager.query(
+      `SELECT ${tabla.columna} FROM ${tabla.nombre} WHERE ${tabla.columna} = ? FOR UPDATE`,
+      [idEntidad],
+    );
   }
 }

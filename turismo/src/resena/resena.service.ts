@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -11,6 +12,10 @@ import { User } from '../user/entities/user.entity';
 import { CreateResenaDto } from './dto/create-resena.dto';
 import { UpdateResenaDto } from './dto/update-resena.dto';
 import { Resena } from './entities/resena.entity';
+import { PaginationQueryDto } from '../common/pagination/pagination-query.dto';
+import { PaginatedResult } from '../common/pagination/paginated-result';
+import { EstadoRevision } from '../sitio-turistico/entities/sitio-turistico.entity';
+import { sanitizeText } from '../common/sanitize-text';
 
 @Injectable()
 // CRUD de reseñas con comprobación de usuario y sitio asociados.
@@ -39,7 +44,11 @@ export class ResenaService {
     }
     try {
       return await this.resenaRepository.save(
-        this.resenaRepository.create({ ...dto, idUsuario: user.id }),
+        this.resenaRepository.create({
+          ...dto,
+          comentario: sanitizeText(dto.comentario),
+          idUsuario: user.id,
+        }),
       );
     } catch (error) {
       if (esDuplicadoDeBaseDeDatos(error)) {
@@ -52,10 +61,35 @@ export class ResenaService {
   }
 
   // Lista reseñas incluyendo el autor y el sitio reseñado.
-  async findAll(): Promise<Resena[]> {
-    return await this.resenaRepository.find({
-      relations: { usuario: true, sitio: true },
-    });
+  async findAll(
+    query: PaginationQueryDto & { idSitio?: number },
+  ): Promise<PaginatedResult<Resena>> {
+    const builder = this.resenaRepository
+      .createQueryBuilder('resena')
+      .leftJoinAndSelect('resena.usuario', 'usuario')
+      .innerJoinAndSelect(
+        'resena.sitio',
+        'sitio',
+        'sitio.estadoRevision = :aprobado',
+        { aprobado: EstadoRevision.Aprobado },
+      );
+    if (query.idSitio !== undefined) {
+      builder.andWhere('resena.idSitio = :idSitio', {
+        idSitio: query.idSitio,
+      });
+    }
+    const [data, total] = await builder
+      .orderBy('resena.idResena', 'DESC')
+      .skip((query.page - 1) * query.limit)
+      .take(query.limit)
+      .getManyAndCount();
+    return {
+      data,
+      total,
+      page: query.page,
+      limit: query.limit,
+      totalPages: Math.ceil(total / query.limit),
+    };
   }
 
   // Busca una reseña por ID y carga sus relaciones.
@@ -96,7 +130,13 @@ export class ResenaService {
       );
     }
 
-    this.resenaRepository.merge(resena, dto);
+    this.resenaRepository.merge(resena, {
+      ...dto,
+      comentario:
+        dto.comentario === undefined
+          ? undefined
+          : sanitizeText(dto.comentario),
+    });
     try {
       await this.resenaRepository.save(resena);
     } catch (error) {
@@ -133,16 +173,21 @@ export class ResenaService {
     idUsuario: number,
     idSitio: number,
   ): Promise<void> {
-    const [userExists, sitioExists] = await Promise.all([
+    const [userExists, sitio] = await Promise.all([
       this.userRepository.existsBy({ id: idUsuario }),
-      this.sitioRepository.existsBy({ idSitio }),
+      this.sitioRepository.findOneBy({ idSitio }),
     ]);
     if (!userExists) {
       throw new NotFoundException(`Usuario con ID ${idUsuario} no encontrado`);
     }
-    if (!sitioExists) {
+    if (!sitio) {
       throw new NotFoundException(
         `Sitio turístico con ID ${idSitio} no encontrado`,
+      );
+    }
+    if (sitio.estadoRevision !== EstadoRevision.Aprobado) {
+      throw new BadRequestException(
+        'Solo se pueden reseñar sitios turísticos aprobados',
       );
     }
   }

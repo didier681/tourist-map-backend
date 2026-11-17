@@ -35,6 +35,9 @@ export class CreateServicioDto {
   // Exige que la descripción sea texto no vacío.
   @IsString()
   @IsNotEmpty()
+  @MaxLength(5000, {
+    message: 'La descripción no puede superar los 5000 caracteres',
+  })
   descripcion: string;
 
   @ApiProperty({

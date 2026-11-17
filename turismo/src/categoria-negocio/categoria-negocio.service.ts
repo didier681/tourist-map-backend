@@ -4,6 +4,9 @@ import { Repository } from 'typeorm';
 import { CreateCategoriaNegocioDto } from './dto/create-categoria-negocio.dto';
 import { UpdateCategoriaNegocioDto } from './dto/update-categoria-negocio.dto';
 import { CategoriaNegocio } from './entities/categoria-negocio.entity';
+import { PaginationQueryDto } from '../common/pagination/pagination-query.dto';
+import { findPaginated } from '../common/pagination/pagination-query-options';
+import { PaginatedResult } from '../common/pagination/paginated-result';
 
 @Injectable()
 // Administra las categorías reutilizables para clasificar negocios.
@@ -22,8 +25,10 @@ export class CategoriaNegocioService {
   }
 
   // Devuelve todas las categorías registradas.
-  async findAll(): Promise<CategoriaNegocio[]> {
-    return await this.categoriaRepository.find();
+  async findAll(
+    query: PaginationQueryDto,
+  ): Promise<PaginatedResult<CategoriaNegocio>> {
+    return await findPaginated(this.categoriaRepository, query);
   }
 
   // Busca una categoría por ID o responde con 404.

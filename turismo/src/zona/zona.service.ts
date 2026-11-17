@@ -9,6 +9,9 @@ import { CreateZonaDto } from './dto/create-zona.dto';
 import { UpdateZonaDto } from './dto/update-zona.dto';
 import { Zona } from './entities/zona.entity';
 import { SitioTuristico } from '../sitio-turistico/entities/sitio-turistico.entity';
+import { PaginationQueryDto } from '../common/pagination/pagination-query.dto';
+import { findPaginated } from '../common/pagination/pagination-query-options';
+import { PaginatedResult } from '../common/pagination/paginated-result';
 
 @Injectable()
 // Reglas de negocio y persistencia CRUD para las zonas geográficas.
@@ -26,8 +29,8 @@ export class ZonaService {
   }
 
   // Lista las zonas disponibles.
-  async findAll(): Promise<Zona[]> {
-    return await this.zonaRepository.find();
+  async findAll(query: PaginationQueryDto): Promise<PaginatedResult<Zona>> {
+    return await findPaginated(this.zonaRepository, query);
   }
 
   // Busca una zona o responde con 404 si no existe.

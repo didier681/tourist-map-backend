@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -28,6 +29,9 @@ import { UpdateNegocioDto } from './dto/update-negocio.dto';
 import { Negocio } from './entities/negocio.entity';
 import { UpdateMembresiaDto } from './dto/update-membresia.dto';
 import { NegocioService } from './negocio.service';
+import { ProximityQueryDto } from '../common/geo/proximity-query.dto';
+import { SiteListQueryDto } from '../common/pagination/site-list-query.dto';
+import { PaginatedResult } from '../common/pagination/paginated-result';
 
 @Controller('negocios')
 @ApiTags('Negocio')
@@ -57,8 +61,16 @@ export class NegocioController {
 
   // Devuelve todos los negocios con sus relaciones.
   @Get()
-  findAll(): Promise<Negocio[]> {
-    return this.negocioService.findAll();
+  findAll(
+    @Query() query: SiteListQueryDto,
+  ): Promise<PaginatedResult<Negocio>> {
+    return this.negocioService.findAll(query);
+  }
+
+  @Get('cercanos')
+  // La consulta pública solo expone datos del negocio necesarios para encontrarlo.
+  cercanos(@Query() query: ProximityQueryDto) {
+    return this.negocioService.findNearby(query);
   }
 
   // Busca un negocio por su identificador.

@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -19,6 +20,8 @@ import { CreateZonaDto } from './dto/create-zona.dto';
 import { UpdateZonaDto } from './dto/update-zona.dto';
 import { ZonaService } from './zona.service';
 import { Zona } from './entities/zona.entity';
+import { PaginationQueryDto } from '../common/pagination/pagination-query.dto';
+import { PaginatedResult } from '../common/pagination/paginated-result';
 
 @Controller('zonas')
 @ApiTags('Zona')
@@ -35,8 +38,10 @@ export class ZonaController {
   }
 
   @Get()
-  findAll(): Promise<Zona[]> {
-    return this.zonaService.findAll();
+  findAll(
+    @Query() query: PaginationQueryDto,
+  ): Promise<PaginatedResult<Zona>> {
+    return this.zonaService.findAll(query);
   }
 
   @Get(':id')

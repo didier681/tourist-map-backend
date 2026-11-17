@@ -32,6 +32,8 @@ import { CreateTarifaDto } from './dto/create-tarifa.dto';
 import { UpdateTarifaDto } from './dto/update-tarifa.dto';
 import { Tarifa } from './entities/tarifa.entity';
 import { TarifaService } from './tarifa.service';
+import { PaginationQueryDto } from '../common/pagination/pagination-query.dto';
+import { PaginatedResult } from '../common/pagination/paginated-result';
 
 @Controller('tarifas')
 @ApiTags('Tarifa')
@@ -90,8 +92,10 @@ export class TarifaController {
 
   // Devuelve todas las tarifas con su servicio asociado.
   @Get()
-  findAll(): Promise<Tarifa[]> {
-    return this.tarifaService.findAll();
+  findAll(
+    @Query() query: PaginationQueryDto,
+  ): Promise<PaginatedResult<Tarifa>> {
+    return this.tarifaService.findAll(query);
   }
 
   // Busca una tarifa por su identificador.

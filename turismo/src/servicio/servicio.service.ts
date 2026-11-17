@@ -10,6 +10,10 @@ import { CreateServicioDto } from './dto/create-servicio.dto';
 import { UpdateServicioDto } from './dto/update-servicio.dto';
 import { Servicio } from './entities/servicio.entity';
 import { User, UserRole } from '../user/entities/user.entity';
+import { PaginationQueryDto } from '../common/pagination/pagination-query.dto';
+import { findPaginated } from '../common/pagination/pagination-query-options';
+import { PaginatedResult } from '../common/pagination/paginated-result';
+import { sanitizeText } from '../common/sanitize-text';
 
 @Injectable()
 // Gestiona servicios y verifica el negocio al que pertenecen.
@@ -26,13 +30,18 @@ export class ServicioService {
   async create(dto: CreateServicioDto, user: User): Promise<Servicio> {
     await this.validateNegocio(dto.idNegocio, user);
     return await this.servicioRepository.save(
-      this.servicioRepository.create(dto),
+      this.servicioRepository.create({
+        ...dto,
+        descripcion: sanitizeText(dto.descripcion),
+      }),
     );
   }
 
   // Lista servicios incluyendo negocio y tarifas.
-  async findAll(): Promise<Servicio[]> {
-    return await this.servicioRepository.find({
+  async findAll(
+    query: PaginationQueryDto,
+  ): Promise<PaginatedResult<Servicio>> {
+    return await findPaginated(this.servicioRepository, query, {
       relations: { negocio: true, tarifas: true },
     });
   }
@@ -66,7 +75,13 @@ export class ServicioService {
     if (dto.idNegocio !== undefined) {
       await this.validateNegocio(dto.idNegocio, user);
     }
-    this.servicioRepository.merge(servicio, dto);
+    this.servicioRepository.merge(servicio, {
+      ...dto,
+      descripcion:
+        dto.descripcion === undefined
+          ? undefined
+          : sanitizeText(dto.descripcion),
+    });
     await this.servicioRepository.save(servicio);
     return await this.findOne(id);
   }

@@ -17,6 +17,9 @@ import { UpdateTarifaDto } from './dto/update-tarifa.dto';
 import { Tarifa } from './entities/tarifa.entity';
 import { User, UserRole } from '../user/entities/user.entity';
 import { Negocio } from '../negocio/entities/negocio.entity';
+import { PaginationQueryDto } from '../common/pagination/pagination-query.dto';
+import { findPaginated } from '../common/pagination/pagination-query-options';
+import { PaginatedResult } from '../common/pagination/paginated-result';
 
 @Injectable()
 // Gestiona tarifas, su servicio asociado y la coherencia de su vigencia.
@@ -46,8 +49,12 @@ export class TarifaService {
   }
 
   // Lista tarifas incluyendo el servicio al que pertenecen.
-  async findAll(): Promise<Tarifa[]> {
-    return await this.tarifaRepository.find({ relations: { servicio: true } });
+  async findAll(
+    query: PaginationQueryDto,
+  ): Promise<PaginatedResult<Tarifa>> {
+    return await findPaginated(this.tarifaRepository, query, {
+      relations: { servicio: true },
+    });
   }
 
   // Devuelve las tarifas vigentes hoy para un servicio existente.

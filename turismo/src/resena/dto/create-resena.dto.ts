@@ -2,6 +2,7 @@ import {
   IsInt,
   IsNotEmpty,
   IsString,
+  MaxLength,
   Max,
   Min,
 } from 'class-validator';
@@ -34,5 +35,8 @@ export class CreateResenaDto {
   })
   @IsString()
   @IsNotEmpty()
+  @MaxLength(2000, {
+    message: 'El comentario no puede superar los 2000 caracteres',
+  })
   comentario: string;
 }

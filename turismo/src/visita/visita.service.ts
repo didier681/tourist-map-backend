@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -12,6 +13,7 @@ import { Zona } from '../zona/entities/zona.entity';
 import { CreateVisitaDto } from './dto/create-visita.dto';
 import { UpdateVisitaDto } from './dto/update-visita.dto';
 import { Visita } from './entities/visita.entity';
+import { haversineDistanceMeters } from '../common/geo/haversine';
 
 @Injectable()
 // CRUD del historial de visitas y validación de sus relaciones geográficas.
@@ -29,7 +31,13 @@ export class VisitaService {
 
   // Registra la visita después de validar sus tres referencias.
   async create(dto: CreateVisitaDto, user: User): Promise<Visita> {
-    await this.validateReferences(user.id, dto.idZona, dto.idSitio);
+    await this.validateReferences(
+      user.id,
+      dto.idZona,
+      dto.idSitio,
+      dto.latitud,
+      dto.longitud,
+    );
     return await this.visitaRepository.save(
       this.visitaRepository.create({ ...dto, idUsuario: user.id }),
     );
@@ -76,7 +84,9 @@ export class VisitaService {
 
     const idZona = dto.idZona ?? visita.idZona;
     const idSitio = dto.idSitio ?? visita.idSitio;
-    await this.validateReferences(user.id, idZona, idSitio);
+    const latitud = dto.latitud ?? visita.latitud;
+    const longitud = dto.longitud ?? visita.longitud;
+    await this.validateReferences(user.id, idZona, idSitio, latitud, longitud);
 
     this.visitaRepository.merge(visita, dto);
     await this.visitaRepository.save(visita);
@@ -104,6 +114,8 @@ export class VisitaService {
     idUsuario: number,
     idZona: number,
     idSitio: number,
+    latitud: string,
+    longitud: string,
   ): Promise<void> {
     const [userExists, zona, sitio] = await Promise.all([
       this.userRepository.existsBy({ id: idUsuario }),
@@ -125,6 +137,22 @@ export class VisitaService {
     if (sitio.idZona !== idZona) {
       throw new UnprocessableEntityException(
         'El sitio turístico no pertenece a la zona indicada',
+      );
+    }
+    if (sitio.estado !== 'activo' || sitio.estadoRevision !== 'aprobado') {
+      throw new BadRequestException(
+        'Solo se pueden registrar visitas a sitios activos y aprobados',
+      );
+    }
+
+    // Impide que el check-in se use para registrar visitas desde ubicaciones remotas.
+    const distancia = haversineDistanceMeters(
+      { lat: Number(sitio.latitud), lng: Number(sitio.longitud) },
+      { lat: Number(latitud), lng: Number(longitud) },
+    );
+    if (distancia >= 300) {
+      throw new BadRequestException(
+        'Debes estar a menos de 300 metros del sitio para registrar la visita',
       );
     }
   }

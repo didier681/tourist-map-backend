@@ -30,7 +30,9 @@ describe('Reglas de negocio', () => {
       resenas as unknown as Repository<Resena>,
       { existsBy: vi.fn().mockResolvedValue(true) } as unknown as Repository<User>,
       {
-        existsBy: vi.fn().mockResolvedValue(true),
+        findOneBy: vi.fn().mockResolvedValue({
+          estadoRevision: 'aprobado',
+        }),
       } as unknown as Repository<SitioTuristico>,
     );
 
@@ -40,6 +42,25 @@ describe('Reglas de negocio', () => {
         usuario,
       ),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('rechaza reseñar un sitio que aún no ha sido aprobado', async () => {
+    const service = new ResenaService(
+      { existsBy: vi.fn().mockResolvedValue(false) } as unknown as Repository<Resena>,
+      { existsBy: vi.fn().mockResolvedValue(true) } as unknown as Repository<User>,
+      {
+        findOneBy: vi.fn().mockResolvedValue({
+          estadoRevision: 'pendiente',
+        }),
+      } as unknown as Repository<SitioTuristico>,
+    );
+
+    await expect(
+      service.create(
+        { idSitio: 2, calificacion: 5, comentario: 'Excelente' },
+        usuario,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('rechaza coordenadas de negocio fuera de rango', async () => {
@@ -120,9 +141,19 @@ describe('Reglas de negocio', () => {
 
   it('limita a diez registros multimedia por entidad', async () => {
     const service = new MultimediaService(
-      { countBy: vi.fn().mockResolvedValue(10) } as unknown as Repository<Multimedia>,
+      {} as Repository<Multimedia>,
       { existsBy: vi.fn().mockResolvedValue(true) } as unknown as Repository<SitioTuristico>,
       {} as Repository<Negocio>,
+      {
+        transaction: vi.fn(async (callback) =>
+          await callback({
+            query: vi.fn().mockResolvedValue([]),
+            getRepository: vi.fn(() => ({
+              countBy: vi.fn().mockResolvedValue(10),
+            })),
+          }),
+        ),
+      } as unknown as DataSource,
     );
 
     await expect(

@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -21,6 +22,8 @@ import { CreateServicioDto } from './dto/create-servicio.dto';
 import { UpdateServicioDto } from './dto/update-servicio.dto';
 import { Servicio } from './entities/servicio.entity';
 import { ServicioService } from './servicio.service';
+import { PaginationQueryDto } from '../common/pagination/pagination-query.dto';
+import { PaginatedResult } from '../common/pagination/paginated-result';
 
 @Controller('servicios')
 @ApiTags('Servicio')
@@ -43,8 +46,10 @@ export class ServicioController {
 
   // Devuelve todos los servicios con su negocio y tarifas.
   @Get()
-  findAll(): Promise<Servicio[]> {
-    return this.servicioService.findAll();
+  findAll(
+    @Query() query: PaginationQueryDto,
+  ): Promise<PaginatedResult<Servicio>> {
+    return this.servicioService.findAll(query);
   }
 
   // Busca un servicio por su identificador.

@@ -27,6 +27,14 @@ import { SugerirSitioTuristicoDto } from './dto/sugerir-sitio-turistico.dto';
 import { RechazarSitioTuristicoDto } from './dto/rechazar-sitio-turistico.dto';
 import { ConfirmacionSitio } from './entities/confirmacion-sitio.entity';
 import { Resena } from '../resena/entities/resena.entity';
+import {
+  calculateBoundingBox,
+  haversineDistanceMeters,
+} from '../common/geo/haversine';
+import { ProximityQueryDto } from '../common/geo/proximity-query.dto';
+import { SiteListQueryDto } from '../common/pagination/site-list-query.dto';
+import { PaginatedResult, paginateArray } from '../common/pagination/paginated-result';
+import { sanitizeText } from '../common/sanitize-text';
 
 @Injectable()
 // Gestiona sitios turísticos, sugerencias de la comunidad y su moderación.
@@ -50,14 +58,24 @@ export class SitioTuristicoService {
     dto: CreateSitioTuristicoDto,
     user: User,
   ): Promise<SitioTuristico> {
-    const zoneExists = await this.zonaRepository.existsBy({
-      idZona: dto.idZona,
-    });
-    if (!zoneExists) {
+    const zona = await this.zonaRepository.findOneBy({ idZona: dto.idZona });
+    if (!zona) {
       throw new NotFoundException(`Zona con ID ${dto.idZona} no encontrada`);
     }
     await this.assertCanManageZone(dto.idZona, user);
-    return await this.sitioRepository.save(this.sitioRepository.create(dto));
+    this.assertInsideZone(
+      Number(dto.latitud),
+      Number(dto.longitud),
+      zona.latitud,
+      zona.longitud,
+      zona.radioCoberturaM,
+    );
+    return await this.sitioRepository.save(
+      this.sitioRepository.create({
+        ...dto,
+        descripcion: sanitizeText(dto.descripcion),
+      }),
+    );
   }
 
   // Registra una sugerencia pendiente después de validar zona, cuota y duplicados.
@@ -65,74 +83,164 @@ export class SitioTuristicoService {
     dto: SugerirSitioTuristicoDto,
     user: User,
   ): Promise<SitioTuristico> {
-    const zoneExists = await this.zonaRepository.existsBy({
-      idZona: dto.idZona,
-    });
-    if (!zoneExists) {
+    const zona = await this.zonaRepository.findOneBy({ idZona: dto.idZona });
+    if (!zona) {
       throw new NotFoundException(`Zona con ID ${dto.idZona} no encontrada`);
     }
+    this.assertInsideZone(
+      Number(dto.latitud),
+      Number(dto.longitud),
+      zona.latitud,
+      zona.longitud,
+      zona.radioCoberturaM,
+    );
 
-    const inicioDia = new Date();
-    inicioDia.setHours(0, 0, 0, 0);
-    const inicioDiaSiguiente = new Date(inicioDia);
-    inicioDiaSiguiente.setDate(inicioDiaSiguiente.getDate() + 1);
-    const sugerenciasHoy = await this.sitioRepository
-      .createQueryBuilder('sitio')
-      .where('sitio.idUsuarioSugiere = :idUsuario', { idUsuario: user.id })
-      .andWhere('sitio.fechaCreacion >= :inicioDia', { inicioDia })
-      .andWhere('sitio.fechaCreacion < :inicioDiaSiguiente', {
-        inicioDiaSiguiente,
-      })
-      .getCount();
-    if (sugerenciasHoy >= 3) {
-      throw new BadRequestException(
-        'Has alcanzado el límite de 3 sugerencias de sitios turísticos por día',
+    return await this.dataSource.transaction(async (manager) => {
+      // Serializa solicitudes del mismo usuario antes de contar para no superar la cuota diaria.
+      await manager.query(
+        'SELECT id_usuario FROM users WHERE id_usuario = ? FOR UPDATE',
+        [user.id],
       );
-    }
+      const inicioDia = new Date();
+      inicioDia.setHours(0, 0, 0, 0);
+      const inicioDiaSiguiente = new Date(inicioDia);
+      inicioDiaSiguiente.setDate(inicioDiaSiguiente.getDate() + 1);
+      const repository = manager.getRepository(SitioTuristico);
+      const sugerenciasHoy = await repository
+        .createQueryBuilder('sitio')
+        .where('sitio.idUsuarioSugiere = :idUsuario', { idUsuario: user.id })
+        .andWhere('sitio.fechaCreacion >= :inicioDia', { inicioDia })
+        .andWhere('sitio.fechaCreacion < :inicioDiaSiguiente', {
+          inicioDiaSiguiente,
+        })
+        .getCount();
+      if (sugerenciasHoy >= 3) {
+        throw new BadRequestException(
+          'Has alcanzado el límite de 3 sugerencias de sitios turísticos por día',
+        );
+      }
 
-    const sitiosCercanos = await this.sitioRepository
-      .createQueryBuilder('sitio')
-      .where('sitio.estadoRevision IN (:...estados)', {
-        estados: [EstadoRevision.Pendiente, EstadoRevision.Aprobado],
-      })
-      .andWhere(
-        '2 * 6371000 * ASIN(SQRT(POWER(SIN(RADIANS(sitio.latitud - :latitud) / 2), 2) + COS(RADIANS(:latitud)) * COS(RADIANS(sitio.latitud)) * POWER(SIN(RADIANS(sitio.longitud - :longitud) / 2), 2))) < :distancia',
-        {
-          latitud: Number(dto.latitud),
-          longitud: Number(dto.longitud),
-          distancia: 200,
-        },
-      )
-      .getMany();
-    const duplicado = sitiosCercanos.find((sitio) =>
-      nombresParecidos(sitio.nombre, dto.nombre),
-    );
-    if (duplicado) {
-      throw new ConflictException({
-        message: 'Ya existe un sitio con un nombre parecido a menos de 200 metros',
-        // No devuelve las relaciones ni los datos internos del sitio existente.
-        sitio: { idSitio: duplicado.idSitio, nombre: duplicado.nombre },
-      });
-    }
+      const point = {
+        lat: Number(dto.latitud),
+        lng: Number(dto.longitud),
+      };
+      const box = calculateBoundingBox(point, 200);
+      const sitiosCercanos = await repository
+        .createQueryBuilder('sitio')
+        .where('sitio.estadoRevision IN (:...estados)', {
+          estados: [EstadoRevision.Pendiente, EstadoRevision.Aprobado],
+        })
+        .andWhere('sitio.latitud BETWEEN :minLat AND :maxLat', box)
+        .andWhere('sitio.longitud BETWEEN :minLng AND :maxLng', box)
+        .getMany();
+      const duplicado = sitiosCercanos.find(
+        (sitio) =>
+          haversineDistanceMeters(point, {
+            lat: Number(sitio.latitud),
+            lng: Number(sitio.longitud),
+          }) < 200 && nombresParecidos(sitio.nombre, dto.nombre),
+      );
+      if (duplicado) {
+        throw new ConflictException({
+          message:
+            'Ya existe un sitio con un nombre parecido a menos de 200 metros',
+          // No devuelve las relaciones ni los datos internos del sitio existente.
+          sitio: { idSitio: duplicado.idSitio, nombre: duplicado.nombre },
+        });
+      }
 
-    return await this.sitioRepository.save(
-      this.sitioRepository.create({
-        ...dto,
-        estadoRevision: EstadoRevision.Pendiente,
-        idUsuarioSugiere: user.id,
-        motivoRechazo: null,
-        confirmaciones: 0,
-      }),
-    );
+      return await repository.save(
+        repository.create({
+          ...dto,
+          descripcion: sanitizeText(dto.descripcion),
+          estadoRevision: EstadoRevision.Pendiente,
+          idUsuarioSugiere: user.id,
+          motivoRechazo: null,
+          confirmaciones: 0,
+        }),
+      );
+    });
   }
 
   // Incluye la zona y las categorías para entregar el contexto del sitio.
   // Los endpoints públicos solo exponen sitios aprobados.
-  async findAll(): Promise<SitioTuristico[]> {
-    return await this.sitioRepository.find({
-      where: { estadoRevision: EstadoRevision.Aprobado },
-      relations: { zona: true, categorias: { categoria: true } },
-    });
+  async findAll(
+    query: SiteListQueryDto,
+  ): Promise<PaginatedResult<SitioTuristico>> {
+    const builder = this.sitioRepository
+      .createQueryBuilder('sitio')
+      .leftJoinAndSelect('sitio.zona', 'zona')
+      .leftJoinAndSelect('sitio.categorias', 'sitioCategoria')
+      .leftJoinAndSelect('sitioCategoria.categoria', 'categoria')
+      .where('sitio.estadoRevision = :estadoRevision', {
+        estadoRevision: EstadoRevision.Aprobado,
+      });
+    if (query.idZona !== undefined) {
+      builder.andWhere('sitio.idZona = :idZona', { idZona: query.idZona });
+    }
+    if (query.q?.trim()) {
+      builder.andWhere('sitio.nombre LIKE :nombre', {
+        nombre: `%${query.q.trim()}%`,
+      });
+    }
+    const [data, total] = await builder
+      .distinct(true)
+      .orderBy('sitio.idSitio', 'ASC')
+      .skip((query.page - 1) * query.limit)
+      .take(query.limit)
+      .getManyAndCount();
+
+    return {
+      data,
+      total,
+      page: query.page,
+      limit: query.limit,
+      totalPages: Math.ceil(total / query.limit),
+    };
+  }
+
+  // Prefiltra por caja en SQL y calcula la distancia exacta solo para candidatos próximos.
+  async findNearby(query: ProximityQueryDto) {
+    const point = { lat: Number(query.lat), lng: Number(query.lng) };
+    const box = calculateBoundingBox(point, query.radioM);
+    const builder = this.sitioRepository
+      .createQueryBuilder('sitio')
+      .leftJoinAndSelect('sitio.zona', 'zona')
+      .leftJoinAndSelect('sitio.categorias', 'sitioCategoria')
+      .leftJoinAndSelect('sitioCategoria.categoria', 'categoria')
+      .where('sitio.estadoRevision = :estadoRevision', {
+        estadoRevision: EstadoRevision.Aprobado,
+      })
+      .andWhere('sitio.estado = :estado', { estado: 'activo' })
+      .andWhere('sitio.latitud BETWEEN :minLat AND :maxLat', box)
+      .andWhere('sitio.longitud BETWEEN :minLng AND :maxLng', box);
+    if (query.idZona !== undefined) {
+      builder.andWhere('sitio.idZona = :idZona', { idZona: query.idZona });
+    }
+    if (query.idCategoria !== undefined) {
+      builder.andWhere('categoria.idCategoria = :idCategoria', {
+        idCategoria: query.idCategoria,
+      });
+    }
+    if (query.q?.trim()) {
+      builder.andWhere('sitio.nombre LIKE :nombre', {
+        nombre: `%${query.q.trim()}%`,
+      });
+    }
+
+    const sitios = await builder.distinct(true).getMany();
+    const cercanos = sitios
+      .map((sitio) => ({
+        ...sitio,
+        distanciaM: haversineDistanceMeters(point, {
+          lat: Number(sitio.latitud),
+          lng: Number(sitio.longitud),
+        }),
+      }))
+      .filter((sitio) => sitio.distanciaM <= query.radioM)
+      .sort((a, b) => a.distanciaM - b.distanciaM);
+
+    return paginateArray(cercanos, query);
   }
 
   // Devuelve un sitio aprobado con sus relaciones o responde con 404.
@@ -217,7 +325,7 @@ export class SitioTuristicoService {
     const sitio = await this.findForModeration(id);
     await this.assertCanManageZone(sitio.idZona, user);
     sitio.estadoRevision = EstadoRevision.Rechazado;
-    sitio.motivoRechazo = dto.motivoRechazo;
+    sitio.motivoRechazo = sanitizeText(dto.motivoRechazo);
     const rechazado = await this.sitioRepository.save(sitio);
     // Registra el rechazo sin repetir el motivo, que puede contener datos aportados por usuarios.
     this.logger.log(`Sugerencia ${id} rechazada por el usuario ${user.id}`);
@@ -234,6 +342,11 @@ export class SitioTuristicoService {
         if (!sitio) {
           throw new NotFoundException(
             `Sitio turístico con ID ${id} no encontrado`,
+          );
+        }
+        if (sitio.estadoRevision !== EstadoRevision.Pendiente) {
+          throw new BadRequestException(
+            'Solo se pueden confirmar sitios turísticos pendientes',
           );
         }
         if (sitio.idUsuarioSugiere === user.id) {
@@ -275,18 +388,46 @@ export class SitioTuristicoService {
     if (!sitio) {
       throw new NotFoundException(`Sitio turístico con ID ${id} no encontrado`);
     }
-    if (dto.idZona !== undefined) {
-      const zoneExists = await this.zonaRepository.existsBy({
-        idZona: dto.idZona,
-      });
-      if (!zoneExists) {
-        throw new NotFoundException(`Zona con ID ${dto.idZona} no encontrada`);
-      }
+    const idZona = dto.idZona ?? sitio.idZona;
+    const zona = await this.zonaRepository.findOneBy({ idZona });
+    if (!zona) {
+      throw new NotFoundException(`Zona con ID ${idZona} no encontrada`);
     }
     await this.assertCanManageZone(sitio.idZona, user);
-    await this.assertCanManageZone(dto.idZona ?? sitio.idZona, user);
-    this.sitioRepository.merge(sitio, dto);
+    await this.assertCanManageZone(idZona, user);
+    this.assertInsideZone(
+      Number(dto.latitud ?? sitio.latitud),
+      Number(dto.longitud ?? sitio.longitud),
+      zona.latitud,
+      zona.longitud,
+      zona.radioCoberturaM,
+    );
+    this.sitioRepository.merge(sitio, {
+      ...dto,
+      descripcion:
+        dto.descripcion === undefined
+          ? undefined
+          : sanitizeText(dto.descripcion),
+    });
     return await this.sitioRepository.save(sitio);
+  }
+
+  private assertInsideZone(
+    lat: number,
+    lng: number,
+    zoneLat: string,
+    zoneLng: string,
+    radiusMeters: number,
+  ): void {
+    const distance = haversineDistanceMeters(
+      { lat, lng },
+      { lat: Number(zoneLat), lng: Number(zoneLng) },
+    );
+    if (distance > radiusMeters) {
+      throw new BadRequestException(
+        `Las coordenadas del sitio deben estar dentro del radio de cobertura de ${radiusMeters} metros de la zona`,
+      );
+    }
   }
 
   // Elimina el sitio indicado o responde con 404 si no existe.

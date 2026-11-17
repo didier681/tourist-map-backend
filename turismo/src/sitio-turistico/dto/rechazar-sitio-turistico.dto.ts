@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 
 // El rechazo debe incluir una explicación legible para quien hizo la sugerencia.
 export class RechazarSitioTuristicoDto {
@@ -13,5 +13,8 @@ export class RechazarSitioTuristicoDto {
   )
   @IsString()
   @IsNotEmpty()
+  @MaxLength(2000, {
+    message: 'El motivo no puede superar los 2000 caracteres',
+  })
   motivoRechazo: string;
 }

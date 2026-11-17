@@ -17,7 +17,7 @@ describe('SitioTuristicoService community suggestions', () => {
     save: vi.fn(async (sitio: Partial<SitioTuristico>) => sitio),
     createQueryBuilder: vi.fn(),
   };
-  const zonaRepository = { existsBy: vi.fn() };
+  const zonaRepository = { existsBy: vi.fn(), findOneBy: vi.fn() };
   const gestorZonaRepository = { find: vi.fn(), existsBy: vi.fn() };
   const confirmacionRepository = { existsBy: vi.fn() };
   const dataSource = { transaction: vi.fn() };
@@ -48,9 +48,21 @@ describe('SitioTuristicoService community suggestions', () => {
     sitioRepository.createQueryBuilder.mockReturnValue(
       queryBuilder as unknown as SelectQueryBuilder<SitioTuristico>,
     );
-    zonaRepository.existsBy.mockResolvedValue(true);
+    zonaRepository.findOneBy.mockResolvedValue({
+      idZona: 2,
+      latitud: '8.7500000',
+      longitud: '-75.8833000',
+      radioCoberturaM: 1000,
+    });
     sitioRepository.save.mockImplementation(
       async (sitio: Partial<SitioTuristico>) => sitio,
+    );
+    dataSource.transaction.mockImplementation(
+      async (callback: (manager: unknown) => unknown) =>
+        await callback({
+          query: vi.fn().mockResolvedValue([]),
+          getRepository: vi.fn(() => sitioRepository),
+        }),
     );
     service = new SitioTuristicoService(
       sitioRepository as unknown as Repository<SitioTuristico>,
@@ -72,8 +84,8 @@ describe('SitioTuristicoService community suggestions', () => {
       confirmaciones: 0,
     });
     expect(queryBuilder.andWhere).toHaveBeenCalledWith(
-      expect.stringContaining('ASIN(SQRT'),
-      expect.objectContaining({ distancia: 200 }),
+      'sitio.latitud BETWEEN :minLat AND :maxLat',
+      expect.objectContaining({ minLat: expect.any(Number) }),
     );
   });
 
@@ -88,7 +100,13 @@ describe('SitioTuristicoService community suggestions', () => {
 
   it('returns a conflict with a nearby similarly named site', async () => {
     queryBuilder.getMany.mockResolvedValue([
-      { idSitio: 12, nombre: 'Parque Central', idZona: 2 },
+      {
+        idSitio: 12,
+        nombre: 'Parque Central',
+        idZona: 2,
+        latitud: '8.7501',
+        longitud: '-75.8833',
+      },
     ]);
 
     try {
@@ -103,6 +121,25 @@ describe('SitioTuristicoService community suggestions', () => {
     }
 
     expect(sitioRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('rejects confirmations for sites that are no longer pending', async () => {
+    const findOneBy = vi.fn().mockResolvedValue({
+      idSitio: 7,
+      estadoRevision: EstadoRevision.Aprobado,
+    });
+    const manager = {
+      query: vi.fn().mockResolvedValue([]),
+      getRepository: vi.fn(() => ({ findOneBy })),
+    };
+    dataSource.transaction.mockImplementation(
+      async (callback: (manager: unknown) => unknown) =>
+        await callback(manager),
+    );
+
+    await expect(
+      service.confirm(7, usuario),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('returns no pending sites when a manager has no assigned zones', async () => {

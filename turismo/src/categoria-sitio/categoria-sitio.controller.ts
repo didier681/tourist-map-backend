@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -19,6 +20,8 @@ import { CategoriaSitio } from './entities/categoria-sitio.entity';
 import { CreateCategoriaSitioDto } from './dto/create-categoria-sitio.dto';
 import { UpdateCategoriaSitioDto } from './dto/update-categoria-sitio.dto';
 import { CategoriaSitioService } from './categoria-sitio.service';
+import { PaginationQueryDto } from '../common/pagination/pagination-query.dto';
+import { PaginatedResult } from '../common/pagination/paginated-result';
 
 @Controller('categorias-sitio')
 @ApiTags('CategoriaSitio')
@@ -35,8 +38,10 @@ export class CategoriaSitioController {
   }
 
   @Get()
-  findAll(): Promise<CategoriaSitio[]> {
-    return this.categoriaService.findAll();
+  findAll(
+    @Query() query: PaginationQueryDto,
+  ): Promise<PaginatedResult<CategoriaSitio>> {
+    return this.categoriaService.findAll(query);
   }
 
   @Get(':id')

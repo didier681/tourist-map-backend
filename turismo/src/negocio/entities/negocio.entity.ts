@@ -2,6 +2,7 @@ import {
   Column,
   Entity,
   JoinColumn,
+  Index,
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
@@ -11,6 +12,7 @@ import { NegocioCategoria } from '../../negocio-categoria/entities/negocio-categ
 import { Servicio } from '../../servicio/entities/servicio.entity';
 import { Zona } from '../../zona/entities/zona.entity';
 import { User } from '../../user/entities/user.entity';
+import { Exclude } from 'class-transformer';
 
 // Niveles de membresía permitidos para un negocio.
 export enum EstadoMembresia {
@@ -21,12 +23,16 @@ export enum EstadoMembresia {
 
 // Negocio que siempre pertenece a una zona, asociado opcionalmente a un sitio turístico.
 @Entity('negocios')
+@Index('IDX_negocios_latitud', ['latitud'])
+@Index('IDX_negocios_longitud', ['longitud'])
 export class Negocio {
   // Identificador único del negocio.
   @PrimaryGeneratedColumn({ name: 'id_negocio' })
   idNegocio: number;
 
   // Usuario propietario del negocio.
+  // Se excluye de las respuestas para no revelar el identificador de su cuenta.
+  @Exclude({ toPlainOnly: true })
   @Column({ type: 'int', name: 'id_usuario' })
   idUsuario: number;
 
@@ -57,6 +63,8 @@ export class Negocio {
   nombreComercial: string;
 
   // NIT u otro documento de identificación del negocio.
+  // Los datos fiscales no son necesarios para consultar el catálogo público.
+  @Exclude({ toPlainOnly: true })
   @Column({ type: 'varchar', length: 50, name: 'nit_documento', unique: true })
   nitDocumento: string;
 

@@ -4,6 +4,9 @@ import { Repository } from 'typeorm';
 import { CategoriaSitio } from './entities/categoria-sitio.entity';
 import { CreateCategoriaSitioDto } from './dto/create-categoria-sitio.dto';
 import { UpdateCategoriaSitioDto } from './dto/update-categoria-sitio.dto';
+import { PaginationQueryDto } from '../common/pagination/pagination-query.dto';
+import { findPaginated } from '../common/pagination/pagination-query-options';
+import { PaginatedResult } from '../common/pagination/paginated-result';
 
 @Injectable()
 // Operaciones CRUD de las categorías reutilizables para sitios turísticos.
@@ -21,8 +24,10 @@ export class CategoriaSitioService {
   }
 
   // Devuelve todas las categorías registradas.
-  async findAll(): Promise<CategoriaSitio[]> {
-    return await this.categoriaRepository.find();
+  async findAll(
+    query: PaginationQueryDto,
+  ): Promise<PaginatedResult<CategoriaSitio>> {
+    return await findPaginated(this.categoriaRepository, query);
   }
 
   // Busca una categoría por ID y responde con 404 si no existe.

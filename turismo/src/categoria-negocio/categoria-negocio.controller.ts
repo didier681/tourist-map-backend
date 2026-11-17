@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -19,6 +20,8 @@ import { CreateCategoriaNegocioDto } from './dto/create-categoria-negocio.dto';
 import { UpdateCategoriaNegocioDto } from './dto/update-categoria-negocio.dto';
 import { CategoriaNegocio } from './entities/categoria-negocio.entity';
 import { CategoriaNegocioService } from './categoria-negocio.service';
+import { PaginationQueryDto } from '../common/pagination/pagination-query.dto';
+import { PaginatedResult } from '../common/pagination/paginated-result';
 
 @Controller('categorias-negocio')
 @ApiTags('CategoriaNegocio')
@@ -40,8 +43,10 @@ export class CategoriaNegocioController {
 
   // Devuelve todas las categorías registradas.
   @Get()
-  findAll(): Promise<CategoriaNegocio[]> {
-    return this.categoriaService.findAll();
+  findAll(
+    @Query() query: PaginationQueryDto,
+  ): Promise<PaginatedResult<CategoriaNegocio>> {
+    return this.categoriaService.findAll(query);
   }
 
   // Busca una categoría por su identificador.

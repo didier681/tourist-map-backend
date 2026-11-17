@@ -91,6 +91,19 @@ Las rutas de escritura requieren autenticación y aplican permisos por rol y, cu
 - `GET /favoritos/mios`: lista los favoritos del usuario autenticado. `GET /favoritos` y `GET /favoritos/:idUsuario/:idSitio` son exclusivos de administradores.
 - `PATCH /negocios/:id/membresia`: permite a un administrador cambiar la membresía (`gratis`, `basico` o `premium`). Los negocios nuevos siempre comienzan con membresía gratis.
 
+## Búsqueda y paginación
+
+Los listados de zonas, sitios, categorías, negocios, servicios, tarifas, reseñas y publicidades devuelven `{ data, total, page, limit, totalPages }`. `page` inicia en 1, `limit` en 20 y el máximo permitido es 100. Sitios y negocios aceptan `idZona` y `q`; las reseñas aceptan `idSitio`. Las publicidades activas conservan el filtro de vigencia.
+
+Los endpoints públicos de proximidad exigen latitud y longitud válidas, limitan el radio a 50 km y ordenan por distancia ascendente:
+
+```http
+GET /sitios-turisticos/cercanos?lat=8.7500&lng=-75.8833&radioM=5000&page=1&limit=20
+GET /negocios/cercanos?lat=8.7500&lng=-75.8833&radioM=5000&idCategoria=2&page=1&limit=20
+```
+
+También aceptan `idZona` y `q`. Cada elemento incluye `distanciaM`; los negocios cercanos omiten `nitDocumento` e `idUsuario`. La búsqueda acota primero los candidatos por caja delimitadora en SQL y luego calcula la distancia precisa con Haversine.
+
 ## Módulos
 
 - **Autenticación y usuarios:** `auth` y `user` para registro, inicio de sesión, perfiles y administración de cuentas.

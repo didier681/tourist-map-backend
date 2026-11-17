@@ -19,6 +19,8 @@ import {
   TipoPlanPublicidad,
 } from './entities/publicidad.entity';
 import { User, UserRole } from '../user/entities/user.entity';
+import { PaginationQueryDto } from '../common/pagination/pagination-query.dto';
+import { PaginatedResult } from '../common/pagination/paginated-result';
 
 @Injectable()
 // Gestiona publicidades y valida sus referencias y período de vigencia.
@@ -54,16 +56,29 @@ export class PublicidadService {
   }
 
   // Lista publicidades incluyendo el negocio y el sitio opcional asociado.
-  async findAll(): Promise<Publicidad[]> {
-    return await this.publicidadRepository.find({
+  async findAll(
+    query: PaginationQueryDto,
+  ): Promise<PaginatedResult<Publicidad>> {
+    const [data, total] = await this.publicidadRepository.findAndCount({
       relations: { negocio: true, sitioAsociado: true },
+      skip: (query.page - 1) * query.limit,
+      take: query.limit,
     });
+    return {
+      data,
+      total,
+      page: query.page,
+      limit: query.limit,
+      totalPages: Math.ceil(total / query.limit),
+    };
   }
 
   // Lista campañas activas cuya vigencia incluye la fecha de hoy.
-  async findActivas(): Promise<Publicidad[]> {
+  async findActivas(
+    query: PaginationQueryDto,
+  ): Promise<PaginatedResult<Publicidad>> {
     const hoy = fechaLocalActual();
-    return await this.publicidadRepository.find({
+    const [data, total] = await this.publicidadRepository.findAndCount({
       where: {
         estado: EstadoPublicidad.Activo,
         fechaIni: LessThanOrEqual(hoy),
@@ -71,7 +86,16 @@ export class PublicidadService {
       },
       relations: { negocio: true, sitioAsociado: true },
       order: { fechaIni: 'ASC' },
+      skip: (query.page - 1) * query.limit,
+      take: query.limit,
     });
+    return {
+      data,
+      total,
+      page: query.page,
+      limit: query.limit,
+      totalPages: Math.ceil(total / query.limit),
+    };
   }
 
   // Busca una publicidad por su identificador con sus relaciones.

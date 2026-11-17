@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -24,6 +25,20 @@ import { CreateResenaDto } from './dto/create-resena.dto';
 import { UpdateResenaDto } from './dto/update-resena.dto';
 import { Resena } from './entities/resena.entity';
 import { ResenaService } from './resena.service';
+import { PaginationQueryDto } from '../common/pagination/pagination-query.dto';
+import { Type } from 'class-transformer';
+import { IsInt, IsOptional, Min } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { PaginatedResult } from '../common/pagination/paginated-result';
+
+class ResenaListQueryDto extends PaginationQueryDto {
+  @ApiPropertyOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  idSitio?: number;
+}
 
 @Controller('resenas')
 @ApiTags('Resena')
@@ -46,8 +61,10 @@ export class ResenaController {
   }
 
   @Get()
-  findAll(): Promise<Resena[]> {
-    return this.resenaService.findAll();
+  findAll(
+    @Query() query: ResenaListQueryDto,
+  ): Promise<PaginatedResult<Resena>> {
+    return this.resenaService.findAll(query);
   }
 
   @Get(':id')

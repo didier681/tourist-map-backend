@@ -3,6 +3,7 @@ import {
   CreateDateColumn,
   Entity,
   JoinColumn,
+  Index,
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
@@ -28,6 +29,8 @@ export enum EstadoRevision {
 
 // Lugar turístico georreferenciado que pertenece a una única zona.
 @Entity('sitios_turisticos')
+@Index('IDX_sitios_turisticos_latitud', ['latitud'])
+@Index('IDX_sitios_turisticos_longitud', ['longitud'])
 export class SitioTuristico {
   @PrimaryGeneratedColumn({ name: 'id_sitio' })
   idSitio: number;

@@ -8,13 +8,17 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { QueryFailedError, Repository } from 'typeorm';
+import { Like, QueryFailedError, Repository } from 'typeorm';
 import { SitioTuristico } from '../sitio-turistico/entities/sitio-turistico.entity';
 import { Zona } from '../zona/entities/zona.entity';
 import { CreateNegocioDto } from './dto/create-negocio.dto';
 import { UpdateNegocioDto } from './dto/update-negocio.dto';
 import { Negocio } from './entities/negocio.entity';
 import { User, UserRole } from '../user/entities/user.entity';
+import { calculateBoundingBox, haversineDistanceMeters } from '../common/geo/haversine';
+import { ProximityQueryDto } from '../common/geo/proximity-query.dto';
+import { SiteListQueryDto } from '../common/pagination/site-list-query.dto';
+import { PaginatedResult, paginateArray } from '../common/pagination/paginated-result';
 
 @Injectable()
 // Gestiona negocios, que siempre pertenecen a una zona y pueden asociarse a un sitio.
@@ -35,6 +39,11 @@ export class NegocioService {
   async create(dto: CreateNegocioDto, user: User): Promise<Negocio> {
     this.validateCoordinates(dto.latitud, dto.longitud);
     await this.validateReferences(dto.idZona, dto.idSitio);
+    await this.assertInsideZone(
+      dto.idZona,
+      dto.latitud,
+      dto.longitud,
+    );
     await this.validateNit(dto.nitDocumento);
     try {
       return await this.negocioRepository.save(
@@ -57,15 +66,76 @@ export class NegocioService {
   }
 
   // Lista negocios con el sitio y las categorías asociados.
-  async findAll(): Promise<Negocio[]> {
-    return await this.negocioRepository.find({
+  async findAll(query: SiteListQueryDto): Promise<PaginatedResult<Negocio>> {
+    const where = {
+      ...(query.idZona === undefined ? {} : { idZona: query.idZona }),
+      ...(query.q?.trim()
+        ? { nombreComercial: Like(`%${query.q.trim()}%`) }
+        : {}),
+    };
+    return await this.negocioRepository.findAndCount({
+      where,
       relations: {
         zona: true,
         sitio: true,
         categorias: { categoria: true },
         servicios: true,
       },
-    });
+      skip: (query.page - 1) * query.limit,
+      take: query.limit,
+    }).then(([data, total]) => ({
+      data,
+      total,
+      page: query.page,
+      limit: query.limit,
+      totalPages: Math.ceil(total / query.limit),
+    }));
+  }
+
+  // Devuelve solo información pública, ya que el perfil fiscal y su propietario son privados.
+  async findNearby(query: ProximityQueryDto) {
+    const point = { lat: Number(query.lat), lng: Number(query.lng) };
+    const box = calculateBoundingBox(point, query.radioM);
+    const builder = this.negocioRepository
+      .createQueryBuilder('negocio')
+      .leftJoinAndSelect('negocio.zona', 'zona')
+      .leftJoinAndSelect('negocio.sitio', 'sitio')
+      .leftJoinAndSelect('negocio.categorias', 'negocioCategoria')
+      .leftJoinAndSelect('negocioCategoria.categoria', 'categoria')
+      .leftJoinAndSelect('negocio.servicios', 'servicio')
+      .where('negocio.latitud BETWEEN :minLat AND :maxLat', box)
+      .andWhere('negocio.longitud BETWEEN :minLng AND :maxLng', box);
+    if (query.idZona !== undefined) {
+      builder.andWhere('negocio.idZona = :idZona', { idZona: query.idZona });
+    }
+    if (query.idCategoria !== undefined) {
+      builder.andWhere('categoria.idCategoriaNeg = :idCategoria', {
+        idCategoria: query.idCategoria,
+      });
+    }
+    if (query.q?.trim()) {
+      builder.andWhere('negocio.nombreComercial LIKE :nombre', {
+        nombre: `%${query.q.trim()}%`,
+      });
+    }
+
+    const negocios = await builder.distinct(true).getMany();
+    const cercanos = negocios
+      .map((negocio) => {
+        const { idUsuario: _idUsuario, nitDocumento: _nitDocumento, ...publico } =
+          negocio;
+        return {
+          ...publico,
+          distanciaM: haversineDistanceMeters(point, {
+            lat: Number(negocio.latitud),
+            lng: Number(negocio.longitud),
+          }),
+        };
+      })
+      .filter((negocio) => negocio.distanciaM <= query.radioM)
+      .sort((a, b) => a.distanciaM - b.distanciaM);
+
+    return paginateArray(cercanos, query);
   }
 
   // Recupera un negocio y sus relaciones o responde con 404.
@@ -102,6 +172,7 @@ export class NegocioService {
     const idZona = dto.idZona ?? negocio.idZona;
     const idSitio = dto.idSitio === undefined ? negocio.idSitio : dto.idSitio;
     await this.validateReferences(idZona, idSitio);
+    await this.assertInsideZone(idZona, latitud, longitud);
     const nitDocumento = dto.nitDocumento ?? negocio.nitDocumento;
     await this.validateNit(nitDocumento, id);
     this.negocioRepository.merge(negocio, {
@@ -207,6 +278,26 @@ export class NegocioService {
       }
     }
 
+  }
+
+  private async assertInsideZone(
+    idZona: number,
+    latitud: number,
+    longitud: number,
+  ): Promise<void> {
+    const zona = await this.zonaRepository.findOneBy({ idZona });
+    if (!zona) {
+      throw new NotFoundException(`Zona con ID ${idZona} no encontrada`);
+    }
+    const distancia = haversineDistanceMeters(
+      { lat: latitud, lng: longitud },
+      { lat: Number(zona.latitud), lng: Number(zona.longitud) },
+    );
+    if (distancia > zona.radioCoberturaM) {
+      throw new BadRequestException(
+        `Las coordenadas del negocio deben estar dentro del radio de cobertura de ${zona.radioCoberturaM} metros de la zona`,
+      );
+    }
   }
 }
 
