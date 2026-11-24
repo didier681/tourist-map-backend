@@ -1,8 +1,8 @@
-# Córdoba Cerca
+# Tourist Map
 
 [![CI](https://github.com/didier681/turismo_backend/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/didier681/turismo_backend/actions/workflows/ci.yml)
 
-Córdoba Cerca es una API de turismo para el departamento de Córdoba. Permite consultar y administrar sitios turísticos, negocios y servicios, y ofrece funciones para que las personas visitantes interactúen con el catálogo.
+Tourist Map es una API de turismo para descubrir sitios, negocios y guías cercanos en el departamento de Córdoba, Colombia. Permite consultar y administrar sitios turísticos, negocios y servicios, y ofrece funciones para que las personas visitantes interactúen con el catálogo.
 
 ## Tecnologías
 

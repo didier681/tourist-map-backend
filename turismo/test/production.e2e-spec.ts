@@ -64,7 +64,7 @@ describe('Flujos de producción (MySQL)', () => {
     const users = dataSource.getRepository(User);
     await users.save(
       users.create({
-        email: 'admin@cordobacerca.co',
+        email: 'admin@touristmap.co',
         passwordHash: await bcrypt.hash('AdminSeguro123', 10),
         nombre: 'Administración',
         role: UserRole.Admin,
@@ -77,7 +77,7 @@ describe('Flujos de producción (MySQL)', () => {
     );
     const adminLogin = await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ email: 'admin@cordobacerca.co', password: 'AdminSeguro123' });
+      .send({ email: 'admin@touristmap.co', password: 'AdminSeguro123' });
     expect(adminLogin.status).toBe(200);
     adminToken = adminLogin.body.token as string;
   });

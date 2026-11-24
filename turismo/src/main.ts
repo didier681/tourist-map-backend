@@ -59,9 +59,9 @@ async function bootstrap(): Promise<void> {
   // Evita exponer rutas y esquemas de la API cuando la documentación está desactivada.
   if (configService.get<boolean>('SWAGGER_ENABLED', false)) {
     const swaggerConfig = new DocumentBuilder()
-      .setTitle('API Córdoba Cerca - Turismo')
+      .setTitle('API Tourist Map')
       .setDescription(
-        'API para consultar y administrar información turística de Córdoba.',
+        'API de turismo de Tourist Map para descubrir sitios, negocios y guías cercanos en el departamento de Córdoba, Colombia.',
       )
       .setVersion('1.0')
       .addBearerAuth()

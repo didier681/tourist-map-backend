@@ -40,8 +40,8 @@ export class AuthMailService {
       await transporter.sendMail({
         from,
         to: email,
-        subject: 'Recuperación de contraseña',
-        text: `Para restablecer tu contraseña, abre este enlace (válido por 30 minutos): ${resetUrl.toString()}`,
+        subject: 'Recuperación de contraseña - Tourist Map',
+        text: `Para restablecer tu contraseña de Tourist Map, abre este enlace (válido por 30 minutos): ${resetUrl.toString()}`,
       });
     } catch (error) {
       this.logger.error(
