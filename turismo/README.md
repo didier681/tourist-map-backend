@@ -1,6 +1,6 @@
 # Tourist Map
 
-[![CI](https://github.com/didier681/turismo_backend/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/didier681/turismo_backend/actions/workflows/ci.yml)
+[![CI](https://github.com/didier681/tourist-map-backend/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/didier681/tourist-map-backend/actions/workflows/ci.yml)
 
 Tourist Map es una API de turismo para descubrir sitios, negocios y guías cercanos en el departamento de Córdoba, Colombia. Permite consultar y administrar sitios turísticos, negocios y servicios, y ofrece funciones para que las personas visitantes interactúen con el catálogo.
 
@@ -23,8 +23,8 @@ Tourist Map es una API de turismo para descubrir sitios, negocios y guías cerca
 1. Clona el repositorio y entra al directorio del proyecto:
 
    ```bash
-   git clone https://github.com/didier681/turismo_backend.git
-   cd turismo_backend/turismo
+   git clone https://github.com/didier681/tourist-map-backend.git
+   cd tourist-map-backend/turismo
    ```
 
 2. Instala las dependencias:
